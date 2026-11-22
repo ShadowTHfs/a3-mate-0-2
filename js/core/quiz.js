@@ -49,6 +49,8 @@ window.App = window.App || {};
       hintUsed: false,
       lastCorrect: null,
       mistakes: 0,
+      combo: 0,      // acertos seguidos na sessão
+      bestCombo: 0,
       correctFirst: 0,
       xp: 0,
       heartsLost: 0,
@@ -99,9 +101,12 @@ window.App = window.App || {};
 
     let requeued = false;
     if (correct) {
+      session.combo += 1;
+      session.bestCombo = Math.max(session.bestCombo, session.combo);
       session.resolved += 1;
       if (!item.retry && item.attempts === 1) session.correctFirst += 1;
     } else {
+      session.combo = 0;
       session.mistakes += 1;
       if (session.allowRetry && !item.retry) {
         session.queue.push(newItem(item.q, true, item.attempts)); // volta ao fim da fila uma vez
@@ -110,7 +115,7 @@ window.App = window.App || {};
         session.resolved += 1; // segunda falha ou simulado: a questão se encerra
       }
     }
-    return { correct, item, usedHint: item.usedHint, requeued };
+    return { correct, item, usedHint: item.usedHint, requeued, combo: session.combo };
   }
 
   function next(session) {

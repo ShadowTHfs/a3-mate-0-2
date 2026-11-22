@@ -78,18 +78,106 @@ test("níveis: limites de XP", () => {
   assert.equal(P.levelInfo(300).level, 3);
 });
 
-test("vidas: regeneração de 1 a cada 30 minutos, com limite de 5", () => {
+test("vidas: regeneração de 1 a cada 2 minutos, com limite de 5", () => {
   const { Progress: P, Store } = loadApp();
+  assert.equal(P.HEART_INTERVAL_MS, 2 * MIN);
   const p = Store.createProfile(0);
   p.hearts = 3;
   p.heartsUpdatedAt = 0;
-  P.refillHearts(p, 40 * MIN);
-  assert.equal(p.hearts, 4);
-  assert.equal(p.heartsUpdatedAt, 30 * MIN);
-  assert.equal(P.msUntilNextHeart(p, 40 * MIN), 20 * MIN);
+  P.refillHearts(p, 1.5 * MIN);
+  assert.equal(p.hearts, 3, "antes de 2 minutos nada muda");
+  assert.equal(P.msUntilNextHeart(p, 1.5 * MIN), 0.5 * MIN);
+  P.refillHearts(p, 2 * MIN);
+  assert.equal(p.hearts, 4, "exatamente aos 2:00 volta 1 vida");
+  assert.equal(p.heartsUpdatedAt, 2 * MIN);
+  assert.equal(P.msUntilNextHeart(p, 3 * MIN), 1 * MIN);
   P.refillHearts(p, 200 * MIN);
   assert.equal(p.hearts, 5);
   assert.equal(P.msUntilNextHeart(p, 200 * MIN), 0);
+});
+
+test("vidas: tempo fora do app conta várias vidas e preserva a sobra", () => {
+  const { Progress: P, Store } = loadApp();
+  const p = Store.createProfile(0);
+  p.hearts = 1;
+  p.heartsUpdatedAt = 0;
+  P.refillHearts(p, 5 * MIN); // 5 min fora: +2 vidas, 1 min já andado da próxima
+  assert.equal(p.hearts, 3);
+  assert.equal(P.msUntilNextHeart(p, 5 * MIN), 1 * MIN);
+  P.refillHearts(p, 60 * MIN);
+  assert.equal(p.hearts, 5, "nunca passa do máximo");
+});
+
+test("vidas: cheio não tem contador; status para a interface", () => {
+  const { Progress: P, Store } = loadApp();
+  const p = Store.createProfile(0);
+  const full = P.heartsStatus(P.refillHearts(p, 10 * MIN), 10 * MIN);
+  assert.equal(full.full, true);
+  assert.equal(full.msNext, 0);
+  assert.equal(p.heartsUpdatedAt, 10 * MIN);
+  P.loseHeart(p, 10 * MIN);
+  const st = P.heartsStatus(p, 10.5 * MIN);
+  assert.equal(st.hearts, 4);
+  assert.equal(st.full, false);
+  assert.equal(st.msNext, 1.5 * MIN);
+  assert.ok(Math.abs(st.ratio - 0.25) < 1e-9);
+});
+
+test("vidas: perder vida com contador rodando não reinicia o contador", () => {
+  const { Progress: P, Store } = loadApp();
+  const p = Store.createProfile(0);
+  P.loseHeart(p, 0);            // 4/5, contador começa em 0
+  P.loseHeart(p, 1.5 * MIN);    // 3/5, contador continua de 0
+  assert.equal(p.hearts, 3);
+  assert.equal(p.heartsUpdatedAt, 0);
+  P.loseHeart(p, 2.5 * MIN);    // aos 2:00 voltou 1 (4), agora perde 1 (3); próxima em 1:30
+  assert.equal(p.hearts, 3);
+  assert.equal(P.msUntilNextHeart(p, 2.5 * MIN), 1.5 * MIN);
+});
+
+test("vidas: dados inválidos e relógio no futuro são corrigidos", () => {
+  const { Progress: P, Store } = loadApp();
+  const p = Store.createProfile(0);
+  p.hearts = 9;
+  P.refillHearts(p, 1000);
+  assert.equal(p.hearts, 5);
+  p.hearts = "abc";
+  P.refillHearts(p, 1000);
+  assert.equal(p.hearts, 5);
+  p.hearts = -3;
+  p.heartsUpdatedAt = 50 * MIN; // relógio do aparelho voltou no tempo
+  P.refillHearts(p, 10 * MIN);
+  assert.equal(p.hearts, 0);
+  assert.equal(p.heartsUpdatedAt, 10 * MIN, "contagem recomeça agora em vez de travar");
+  assert.equal(P.msUntilNextHeart(p, 10 * MIN), 2 * MIN);
+});
+
+test("vidas: recarregar a página (salvar e carregar) não reinicia o contador", () => {
+  const storage = memoryStorage();
+  const A = loadApp(storage);
+  const p = A.Store.createProfile(0);
+  A.Progress.loseHeart(p, 0);
+  A.Progress.loseHeart(p, 0);
+  A.Store.save(p);
+  const B = loadApp(storage); // "nova aba"/página recarregada
+  const back = B.Progress.refillHearts(B.Store.load(3 * MIN), 3 * MIN);
+  assert.equal(back.hearts, 4);
+  assert.equal(B.Progress.msUntilNextHeart(back, 3 * MIN), 1 * MIN);
+});
+
+test("quiz: combo conta acertos seguidos e zera no erro", () => {
+  const { Quiz: Q, Data } = loadApp();
+  const qs = Data.questions.slice(0, 4);
+  const s = Q.createSession({ mode: "practice", questions: qs, rng: () => 0.5 });
+  const answerRight = () => { Q.present(s); const it = Q.current(s); Q.select(s, it.options.indexOf(it.q.answer)); return Q.verify(s); };
+  Q.present(s);
+  let r = answerRight(); assert.equal(r.combo, 1); Q.next(s);
+  r = answerRight(); assert.equal(r.combo, 2); Q.next(s);
+  const it = Q.current(s);
+  Q.select(s, it.options.findIndex((o) => o !== it.q.answer));
+  r = Q.verify(s);
+  assert.equal(r.combo, 0);
+  assert.equal(s.bestCombo, 2);
 });
 
 test("vidas: perder vida no máximo inicia o temporizador", () => {
@@ -326,3 +414,48 @@ test("persistência: sem localStorage, o progresso é mantido em memória durant
   App.Store.reset(0);
   assert.equal(App.Store.load(0).xp, 0);
 });
+
+/* ---------- Arte (SVG) ---------- */
+
+function loadArt() {
+  const ctx = { console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  for (const file of ["js/core/utils.js", "js/ui/art.js"]) {
+    vm.runInContext(fs.readFileSync(path.join(ROOT, file), "utf8"), ctx, { filename: file });
+  }
+  return ctx.App.Art;
+}
+
+test("arte: todos os personagens e poses geram SVG sem ícones faltando", () => {
+  const Art = loadArt();
+  const sprite = Art.spriteMarkup();
+  const defined = new Set([...sprite.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
+  const check = (svg, what) => {
+    assert.ok(svg.startsWith("<svg"), what);
+    for (const [, ref] of svg.matchAll(/(?:href="#|url\(#)([^")]+)/g)) {
+      assert.ok(defined.has(ref), `${what}: referência inexistente #${ref}`);
+    }
+  };
+  for (const who of Object.keys(Art.CHARS)) {
+    for (const pose of Art.POSES) check(Art.mascot(pose, 100, who), `${who}/${pose}`);
+  }
+  for (const name of Object.keys(Art.ICONS)) check(Art.icon(name), `ícone ${name}`);
+  for (let lv = 1; lv <= 12; lv += 1) check(Art.levelEmblem(lv, 64), `nível ${lv}`);
+  for (const id of Object.keys(Art.BADGE_ART)) {
+    check(Art.badgeArt(id, true), `conquista ${id}`);
+    check(Art.badgeArt(id, false), `conquista bloqueada ${id}`);
+  }
+});
+
+test("arte: toda conquista tem emblema próprio e os níveis progridem", () => {
+  const Art = loadArt();
+  const { Progress: P } = loadApp();
+  for (const b of P.BADGES) assert.ok(Art.BADGE_ART[b.id], `conquista sem arte: ${b.id}`);
+  assert.equal(Art.levelTier(1).name, "Semente");
+  assert.equal(Art.levelTier(4).index, 3);
+  assert.equal(Art.levelTier(99).index, Art.TIERS.length - 1, "níveis altos usam o último emblema");
+  assert.equal(Art.levelTier(0).index, 0);
+  assert.equal(Art.mascot("cheer", 10), Art.mascot("correct", 10), "humor antigo cai na pose nova");
+});
+

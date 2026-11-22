@@ -2,7 +2,7 @@
 window.App = window.App || {};
 (function (App) {
   "use strict";
-  const { Store, Progress: P, Quiz: Q, Views: V, Utils: U, Sound, Fx } = App;
+  const { Store, Progress: P, Quiz: Q, Views: V, Utils: U, Sound, Fx, Art } = App;
 
   const state = {
     profile: null,
@@ -10,6 +10,7 @@ window.App = window.App || {};
     result: null,    // tela de resultado; só aparece na rota onde foi gerada
     draftAvatar: null,
     draftName: null,
+    heartsOpen: false, // painel "Suas vidas" aberto no topo
   };
 
   const now = () => Date.now();
@@ -64,7 +65,7 @@ window.App = window.App || {};
   function routeView(route, t) {
     const profile = state.profile;
     if (state.result && state.result.route === currentHash()) {
-      return { html: V.resultView(state.result), route: route.name };
+      return { html: V.resultView(state.result, profile), route: route.name };
     }
     switch (route.name) {
       case "lesson": {
@@ -105,7 +106,37 @@ window.App = window.App || {};
 
   function renderStats() {
     const el = document.getElementById("stats");
-    if (el) el.innerHTML = V.statsChips(state.profile, now());
+    if (el) el.innerHTML = V.statsChips(state.profile, now(), state.heartsOpen);
+  }
+
+  /* Atualiza tudo que mostra vidas. full=true quando o NÚMERO de vidas mudou (redesenha os trechos). */
+  function refreshHearts(full) {
+    const t = now();
+    if (full) {
+      const chip = document.activeElement && document.activeElement.closest && document.activeElement.closest(".hearts-wrap");
+      renderStats();
+      if (chip) {
+        const btn = document.querySelector(".chip-hearts[data-action=toggle-hearts]");
+        if (btn) btn.focus({ preventScroll: true });
+      }
+      document.querySelectorAll("[data-hearts-live]").forEach((el) => {
+        el.innerHTML = V.heartsLive(el.dataset.heartsLive, state.profile, t);
+      });
+    }
+    const st = P.heartsStatus(state.profile, t);
+    document.querySelectorAll("[data-heart-sub]").forEach((el) => { el.textContent = V.heartSubText(st); });
+    document.querySelectorAll("[data-heart-line]").forEach((el) => { el.innerHTML = V.heartLine(st); });
+    document.querySelectorAll("[data-heart-fill]").forEach((el) => { el.style.setProperty("--p", st.ratio.toFixed(3)); });
+  }
+
+  function setHeartsOpen(open, focusChip = false) {
+    if (state.heartsOpen === open) return;
+    state.heartsOpen = open;
+    renderStats();
+    if (focusChip || open) {
+      const btn = document.querySelector(".chip-hearts[data-action=toggle-hearts]");
+      if (btn) btn.focus({ preventScroll: true });
+    }
   }
 
   function focusAfterRender(opts) {
@@ -141,10 +172,11 @@ window.App = window.App || {};
     return {
       route: currentHash(),
       eyebrow: "SEM VIDAS",
-      icon: "💔",
+      icon: "heart-empty",
+      mood: "wrong",
       title: "Você ficou sem vidas",
-      subtitle: "Sua lição não foi concluída. As vidas voltam sozinhas, uma a cada 30 minutos.",
-      until: state.profile.heartsUpdatedAt + P.HEART_INTERVAL_MS,
+      subtitle: `Sua lição não foi concluída. As vidas voltam sozinhas, uma a cada ${Math.round(P.HEART_INTERVAL_MS / 60000)} minutos, mesmo com o app fechado.`,
+      heartClock: true,
       actions: [
         { label: "Praticar sem gastar vidas", action: "start-practice", arg: "", primary: true },
         { label: "Voltar à trilha", to: "#/" },
@@ -256,7 +288,6 @@ window.App = window.App || {};
 
     if (outcome === "failed") {
       result = failedResult();
-      result.mood = "sad";
       Sound.play("wrong");
     } else if (s.mode === "lesson") {
       const r = P.completeLesson(state.profile, s.lessonId, { mistakes: s.mistakes, now: t });
@@ -275,8 +306,8 @@ window.App = window.App || {};
       celebrate = r.stars >= 2;
       result = {
         eyebrow: "LIÇÃO CONCLUÍDA",
-        icon: r.stars === 3 ? "🏆" : "⭐",
-        mood: r.stars === 3 ? "cheer" : "happy",
+        icon: r.stars === 3 ? "trophy" : "star",
+        mood: r.stars === 3 ? "finish" : "correct",
         title: r.stars === 3 ? "Lição perfeita!" : "Lição concluída!",
         subtitle: `${s.correctFirst} de ${s.total} acertos na primeira tentativa.`,
         stars: r.stars,
@@ -293,8 +324,9 @@ window.App = window.App || {};
       s.xp += r.xp;
       result = {
         eyebrow: "REVISÃO CONCLUÍDA",
-        icon: "♻️",
-        mood: "happy",
+        icon: "review",
+        mood: "correct",
+        who: "brasa",
         title: "Revisão concluída!",
         subtitle: `${s.correctFirst} de ${s.total} acertos na primeira tentativa.`,
         stats: [
@@ -316,8 +348,9 @@ window.App = window.App || {};
       celebrate = pct >= 60;
       result = {
         eyebrow: "SIMULADO CONCLUÍDO",
-        icon: pct >= 80 ? "🏆" : pct >= 60 ? "🎯" : "📚",
-        mood: pct >= 60 ? "cheer" : "idle",
+        icon: pct >= 80 ? "trophy" : pct >= 60 ? "target" : "book",
+        mood: pct >= 80 ? "finish" : pct >= 60 ? "correct" : "encourage",
+        who: "lumi",
         title: pct >= 80 ? "Excelente desempenho!" : pct >= 60 ? "Bom trabalho!" : "Hora de reforçar a base",
         subtitle: `Você acertou ${hits} de ${s.total} na primeira tentativa.`,
         stats: [
@@ -420,16 +453,16 @@ window.App = window.App || {};
     "pick-avatar": onPickAvatar,
     "toggle-sound": onToggleSound,
     "reset-progress": onReset,
+    "toggle-hearts": () => setHeartsOpen(!state.heartsOpen, true),
   };
 
   function tick() {
     const t = now();
     const before = state.profile.hearts;
     P.refillHearts(state.profile, t);
-    if (state.profile.hearts !== before) {
-      persist();
-      renderStats();
-    }
+    const changed = state.profile.hearts !== before;
+    if (changed) persist();
+    refreshHearts(changed);
     document.querySelectorAll("[data-until]").forEach((el) => {
       el.textContent = U.formatClock(Number(el.dataset.until) - t);
     });
@@ -438,7 +471,36 @@ window.App = window.App || {};
     });
   }
 
+  /* Ícones da navegação, marca e favicon vêm da arte vetorial. */
+  function decorateShell() {
+    Art.mount();
+    document.querySelectorAll("[data-icon]").forEach((el) => {
+      el.innerHTML = Art.icon(el.dataset.icon, { size: Number(el.dataset.size) || 22 });
+    });
+    const mark = document.querySelector(".brand-mark");
+    if (mark) mark.innerHTML = Art.mascot("happy", 44, "raiz", { still: true, label: "" });
+    let fav = document.querySelector("link[rel=icon]");
+    if (!fav) {
+      fav = document.createElement("link");
+      fav.rel = "icon";
+      document.head.appendChild(fav);
+    }
+    fav.type = "image/svg+xml";
+    fav.href = Art.faviconDataUri();
+  }
+
+  /* Outra aba salvou o perfil (ex.: perdeu vida lá): traz o estado atualizado sem reiniciar contadores. */
+  function onStorage(e) {
+    if (e.key !== Store.KEY || !e.newValue) return;
+    const before = state.profile.hearts;
+    state.profile = Store.load(now());
+    P.refillHearts(state.profile, now());
+    refreshHearts(true);
+    if (state.profile.hearts !== before) renderStats();
+  }
+
   function init() {
+    decorateShell();
     indexLessons();
     state.profile = Store.load(now());
     Sound.setEnabled(state.profile.sound !== false);
@@ -448,16 +510,22 @@ window.App = window.App || {};
       if (state.result && state.result.route !== currentHash()) state.result = null;
       render({ navigate: true });
     });
+    window.addEventListener("storage", onStorage);
+    // Ao voltar para a aba (celular bloqueado, aba em segundo plano), recalcula na hora.
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+    window.addEventListener("pageshow", () => tick());
     setInterval(tick, 1000);
     render();
   }
 
   document.addEventListener("click", (e) => {
+    if (state.heartsOpen && !e.target.closest(".hearts-wrap")) setHeartsOpen(false);
     const el = e.target.closest("[data-action]");
     if (!el || el.disabled) return;
     const fn = handlers[el.dataset.action];
     if (fn) {
       e.preventDefault();
+      if (state.heartsOpen && el.dataset.action !== "toggle-hearts" && el.closest(".hearts-panel")) setHeartsOpen(false);
       fn(el.dataset.arg);
     }
   });
@@ -474,6 +542,10 @@ window.App = window.App || {};
   });
 
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && state.heartsOpen) {
+      setHeartsOpen(false, true);
+      return;
+    }
     const s = state.session;
     if (!s || s.finished || !document.body.classList.contains("in-quiz")) return;
     const target = e.target instanceof Element ? e.target : null;

@@ -5,7 +5,7 @@ window.App = window.App || {};
   const { dateKey, addDays, percent } = App.Utils;
 
   const MAX_HEARTS = 5;
-  const HEART_INTERVAL_MS = 30 * 60 * 1000;
+  const HEART_INTERVAL_MS = 2 * 60 * 1000; // 1 vida a cada 2 minutos
   const XP_BY_DIFFICULTY = { 1: 10, 2: 15, 3: 20 };
   const XP_LESSON_FIRST = 20;
   const XP_LESSON_REPEAT = 5;
@@ -27,15 +27,33 @@ window.App = window.App || {};
     return { level, start, next, into, span, ratio: into / span };
   }
 
-  /* ---------- Vidas ---------- */
+  /* ---------- Vidas ----------
+   * Tudo é calculado a partir de heartsUpdatedAt (instante em que o relógio da próxima vida começou),
+   * que fica salvo no perfil. Por isso recarregar, fechar o navegador ou trocar de página
+   * não reinicia a contagem: na volta, o app calcula quantas vidas já deveriam ter voltado.
+   */
+
+  /* Corrige dados antigos ou corrompidos: vidas fora de 0..MAX e horário inválido ou no futuro. */
+  function sanitizeHearts(profile, now) {
+    let hearts = Number(profile.hearts);
+    if (!Number.isFinite(hearts)) hearts = MAX_HEARTS;
+    profile.hearts = Math.max(0, Math.min(MAX_HEARTS, Math.floor(hearts)));
+    const at = Number(profile.heartsUpdatedAt);
+    // Horário no futuro (relógio do aparelho voltou) travaria a recarga: recomeça a contagem agora.
+    profile.heartsUpdatedAt = Number.isFinite(at) && at <= now ? at : now;
+    return profile;
+  }
+
   function refillHearts(profile, now) {
+    sanitizeHearts(profile, now);
     if (profile.hearts >= MAX_HEARTS) {
-      profile.heartsUpdatedAt = now;
+      profile.heartsUpdatedAt = now; // cheio: nenhum contador rodando
       return profile;
     }
     const gained = Math.floor((now - profile.heartsUpdatedAt) / HEART_INTERVAL_MS);
     if (gained > 0) {
       profile.hearts = Math.min(MAX_HEARTS, profile.hearts + gained);
+      // Mantém a "sobra" de tempo: quem ficou 5 min fora ganha 2 vidas e já tem 1 min andado da 3ª.
       profile.heartsUpdatedAt =
         profile.hearts >= MAX_HEARTS ? now : profile.heartsUpdatedAt + gained * HEART_INTERVAL_MS;
     }
@@ -44,12 +62,28 @@ window.App = window.App || {};
 
   function msUntilNextHeart(profile, now) {
     if (profile.hearts >= MAX_HEARTS) return 0;
-    return Math.max(0, profile.heartsUpdatedAt + HEART_INTERVAL_MS - now);
+    return Math.max(0, Math.min(HEART_INTERVAL_MS, profile.heartsUpdatedAt + HEART_INTERVAL_MS - now));
+  }
+
+  /* Situação das vidas para a interface. ratio = quanto da próxima vida já recarregou (0..1). */
+  function heartsStatus(profile, now) {
+    const full = profile.hearts >= MAX_HEARTS;
+    const ms = msUntilNextHeart(profile, now);
+    return {
+      hearts: profile.hearts,
+      max: MAX_HEARTS,
+      full,
+      msNext: ms,
+      ratio: full ? 1 : 1 - ms / HEART_INTERVAL_MS,
+    };
   }
 
   function loseHeart(profile, now) {
+    refillHearts(profile, now); // contabiliza o que já recarregou antes de descontar
+    if (profile.hearts <= 0) return false;
     if (profile.hearts === MAX_HEARTS) profile.heartsUpdatedAt = now; // o temporizador começa agora
-    profile.hearts = Math.max(0, profile.hearts - 1);
+    profile.hearts -= 1;
+    return true;
   }
 
   /* ---------- Sequência de dias ---------- */
@@ -106,10 +140,7 @@ window.App = window.App || {};
     } else {
       t.wrong += 1;
       profile.mistakes[question.id] = (profile.mistakes[question.id] || 0) + 1;
-      if (o.consumesHearts) {
-        loseHeart(profile, o.now);
-        heartLost = true;
-      }
+      if (o.consumesHearts) heartLost = loseHeart(profile, o.now);
     }
     touchStreak(profile, o.now);
     return { xp, heartLost };
@@ -205,6 +236,8 @@ window.App = window.App || {};
     levelInfo,
     refillHearts,
     msUntilNextHeart,
+    heartsStatus,
+    sanitizeHearts,
     loseHeart,
     touchStreak,
     currentStreak,

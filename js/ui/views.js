@@ -12,53 +12,112 @@ window.App = window.App || {};
   };
 
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  const starsText = (n) => "★".repeat(n) + "☆".repeat(3 - n);
 
-  /* Xis, o mascote. Humor: happy | cheer | sad | idle */
-  function mascot(mood = "happy", size = 110) {
-    const mouth = {
-      happy: '<path class="m-stroke" d="M46 76 Q60 90 74 76"/>',
-      idle: '<path class="m-stroke" d="M50 78 Q60 84 70 78"/>',
-      cheer: '<path class="m-mouth" d="M44 74 Q60 100 76 74 Z"/>',
-      sad: '<path class="m-stroke" d="M48 88 Q60 78 72 88"/>',
-    }[mood] || '<path class="m-stroke" d="M46 76 Q60 90 74 76"/>';
-    const eyes = mood === "cheer"
-      ? '<path class="m-stroke" d="M34 54 Q42 42 50 54"/><path class="m-stroke" d="M70 54 Q78 42 86 54"/>'
-      : mood === "sad"
-        ? '<circle class="m-eye" cx="42" cy="54" r="6.5"/><circle class="m-eye" cx="78" cy="54" r="6.5"/>'
-          + '<path class="m-stroke" d="M32 44 L50 48"/><path class="m-stroke" d="M88 44 L70 48"/>'
-        : '<circle class="m-eye" cx="42" cy="52" r="7"/><circle class="m-eye" cx="78" cy="52" r="7"/>'
-          + '<circle class="m-pupil" cx="44" cy="54" r="3"/><circle class="m-pupil" cx="80" cy="54" r="3"/>';
+  const A = App.Art;
+  const icon = (name, size = 24, cls = "") => A.icon(name, { size, cls });
+  const mascot = (pose = "happy", size = 110, who = "raiz", opts) => A.mascot(pose, size, who, opts);
+
+  function starRow(n, size = 16) {
+    return [0, 1, 2].map((i) => icon(i < n ? "star" : "star-empty", size)).join("");
+  }
+
+  /* ---------- Vidas ---------- */
+  function intervalText() {
+    const min = Math.round(P.HEART_INTERVAL_MS / 60000);
+    return `${min} ${min === 1 ? "minuto" : "minutos"}`;
+  }
+
+  function heartSubText(st) {
+    return st.full ? "Vidas completas" : `+1 em ${formatClock(st.msNext)}`;
+  }
+
+  /* Linha "Próxima vida em 1:42" (atualizada a cada segundo pelo app via data-heart-line). */
+  function heartLine(st) {
+    return st.full
+      ? "Vidas completas!"
+      : `Próxima vida em <b class="num">${formatClock(st.msNext)}</b>`;
+  }
+
+  function heartRow(st, size = 32) {
+    let html = "";
+    for (let i = 0; i < st.max; i += 1) {
+      if (i < st.hearts) {
+        html += `<span class="heart-slot full">${icon("heart", size)}</span>`;
+      } else if (i === st.hearts && !st.full) {
+        // vida recarregando: o coração vai enchendo de baixo para cima
+        html += `<span class="heart-slot filling" data-heart-fill style="--p:${st.ratio.toFixed(3)}">`
+          + `${icon("heart-empty", size)}<span class="heart-fill">${icon("heart", size)}</span></span>`;
+      } else {
+        html += `<span class="heart-slot">${icon("heart-empty", size)}</span>`;
+      }
+    }
+    return html;
+  }
+
+  function heartsPanel(profile, now) {
+    const st = P.heartsStatus(profile, now);
+    const pose = st.hearts === 0 ? "wrong" : st.full ? "happy" : "encourage";
     return `
-    <svg class="mascot mascot-${mood}" viewBox="0 0 120 124" width="${size}" height="${size}" role="img" aria-label="Xis, o mascote">
-      <ellipse class="m-shadow" cx="60" cy="119" rx="34" ry="5"/>
-      <g class="m-arm m-arm-l"><ellipse cx="11" cy="74" rx="9" ry="15"/></g>
-      <g class="m-arm m-arm-r"><ellipse cx="109" cy="74" rx="9" ry="15"/></g>
-      <g class="m-body">
-        <path class="m-fill" d="M60 8C92 8 110 34 108 66C106 98 86 112 60 112C34 112 14 98 12 66C10 34 28 8 60 8Z"/>
-        <ellipse class="m-shine" cx="42" cy="32" rx="13" ry="7"/>
-        <circle class="m-cheek" cx="28" cy="72" r="7"/>
-        <circle class="m-cheek" cx="92" cy="72" r="7"/>
-        ${eyes}
-        ${mouth}
-        <text class="m-sigma" x="60" y="104" text-anchor="middle">∑</text>
-      </g>
-    </svg>`;
+      <div class="hearts-panel" id="hearts-panel" role="dialog" aria-label="Suas vidas">
+        <div class="hp-head">
+          ${mascot(pose, 58, "raiz", { label: "" })}
+          <div class="hp-text">
+            <p class="hp-title">Suas vidas</p>
+            <p class="hp-count">Você possui <b>${st.hearts} de ${st.max}</b> vidas.</p>
+          </div>
+          <button type="button" class="icon-btn sm" data-action="toggle-hearts" aria-label="Fechar painel de vidas">${icon("close", 18)}</button>
+        </div>
+        <div class="hp-row" aria-hidden="true">${heartRow(st, 34)}</div>
+        <p class="hp-next" data-heart-line aria-live="off">${heartLine(st)}</p>
+        <ul class="hp-rules">
+          <li>Você recupera 1 vida a cada ${intervalText()}, mesmo com o app fechado.</li>
+          <li>Só os erros nas lições gastam vidas.</li>
+          <li>Revisão e simulado não gastam vidas.</li>
+        </ul>
+        ${st.hearts === 0 ? `<button type="button" class="btn btn-ghost btn-block" data-action="start-practice" data-arg="">Praticar sem gastar vidas</button>` : ""}
+      </div>`;
+  }
+
+  function heartsChip(profile, now, open) {
+    const st = P.heartsStatus(profile, now);
+    return `
+      <div class="hearts-wrap">
+        <button type="button" class="chip chip-hearts${st.hearts === 0 ? " is-empty" : ""}" data-action="toggle-hearts"
+          aria-expanded="${open}" aria-controls="hearts-panel"
+          aria-label="Vidas: ${st.hearts} de ${st.max}. Ver detalhes" title="Vidas">
+          ${icon("heart", 22, st.hearts === 0 ? "ico-dim" : "")}
+          <span class="hearts-txt"><b>${st.hearts}/${st.max}</b><small data-heart-sub>${heartSubText(st)}</small></span>
+        </button>
+        ${open ? heartsPanel(profile, now) : ""}
+      </div>`;
+  }
+
+  /* Trechos que dependem do número de vidas e são trocados pelo app quando uma vida volta. */
+  function heartsLive(kind, profile, now) {
+    const st = P.heartsStatus(profile, now);
+    if (kind === "quiz") {
+      return `<span class="chip chip-hearts compact" aria-label="${st.hearts} de ${st.max} vidas">${icon("heart", 20)} <b>${st.hearts}</b>`
+        + `${st.full ? "" : `<small data-heart-sub>${heartSubText(st)}</small>`}</span>`;
+    }
+    return st.hearts > 0
+      ? `${icon("heart", 18)} ${st.hearts} ${st.hearts === 1 ? "vida disponível" : "vidas disponíveis"}`
+      : `${icon("heart-empty", 18)} Sem vidas no momento. <span data-heart-line>${heartLine(st)}</span>`;
   }
 
   function soundButton(profile) {
     const on = profile.sound !== false;
     return `<button type="button" class="chip chip-btn" data-action="toggle-sound" aria-pressed="${on}"
-      aria-label="Efeitos sonoros ${on ? "ligados" : "desligados"}" title="Efeitos sonoros">${on ? "🔊" : "🔇"}</button>`;
+      aria-label="Efeitos sonoros ${on ? "ligados" : "desligados"}" title="Efeitos sonoros">${icon(on ? "sound" : "sound-off", 22)}</button>`;
   }
 
-  function statsChips(profile, now) {
+  function statsChips(profile, now, heartsOpen = false) {
     const info = P.levelInfo(profile.xp);
     const streak = P.currentStreak(profile, now);
     return `
-      <span class="chip chip-streak" title="Sequência de dias"><span aria-hidden="true">🔥</span> <b>${streak}</b></span>
-      <span class="chip chip-xp" title="XP total"><span aria-hidden="true">⭐</span> <b>${profile.xp}</b><small> · Nv ${info.level}</small></span>
-      <span class="chip chip-hearts" title="Vidas"><span aria-hidden="true">❤️</span> <b>${profile.hearts}</b></span>
+      <span class="chip chip-streak" title="Sequência de dias">${icon("flame", 22)} <b>${streak}</b><span class="sr-only"> dias de sequência</span></span>
+      <span class="chip chip-xp" title="XP total e nível">${icon("star", 22)} <b>${profile.xp}</b><span class="sr-only"> XP, nível ${info.level}</span>
+        <span class="chip-level" aria-hidden="true">${A.levelEmblem(info.level, 26, { label: "" })}</span></span>
+      ${heartsChip(profile, now, heartsOpen)}
       ${soundButton(profile)}`;
   }
 
@@ -71,8 +130,12 @@ window.App = window.App || {};
   function onboardingView(avatar, name) {
     return `
     <section class="page narrow onboard">
-      <div class="onboard-hero">${mascot("cheer", 150)}</div>
-      <div class="speech">Oi! Eu sou o Xis. Vamos montar a sua trilha de álgebra?</div>
+      <div class="onboard-hero">
+        <span class="cast cast-l">${mascot("happy", 86, "lumi")}</span>
+        ${mascot("encourage", 160, "raiz")}
+        <span class="cast cast-r">${mascot("happy", 86, "brasa")}</span>
+      </div>
+      <div class="speech">Oi! Eu sou o Raiz. Com o Lumi e a Brasa, vamos montar a sua trilha de álgebra?</div>
       <h1 tabindex="-1">Bem-vindo ao Desafio!</h1>
       <form class="card form" data-form="onboarding">
         <label for="name">Como podemos te chamar?</label>
@@ -88,14 +151,14 @@ window.App = window.App || {};
   function nodeHtml(s, i, isNext) {
     const cls = s.completed ? "done" : s.unlocked ? "open" : "locked";
     const side = i % 2 === 0 ? "left" : "right";
-    const content = s.completed ? "✓" : s.unlocked ? s.lesson.number : "🔒";
+    const content = s.completed ? icon("check", 44) : s.unlocked ? s.lesson.number : icon("lock", 34);
     const aria = s.completed
       ? `, concluída, ${s.stars} de 3 estrelas`
       : s.unlocked ? "" : ", bloqueada";
     const attrs = s.unlocked ? `data-action="go" data-arg="#/lesson/${s.lesson.id}"` : "disabled";
-    const crown = s.stars === 3 ? '<span class="crown" aria-hidden="true">👑</span>' : "";
+    const crown = s.stars === 3 ? `<span class="crown" aria-hidden="true">${icon("crown", 30)}</span>` : "";
     const bubble = isNext ? '<span class="start-bubble" aria-hidden="true">COMEÇAR</span>' : "";
-    const stars = s.completed ? `<span class="stars" aria-hidden="true">${starsText(s.stars)}</span>` : "";
+    const stars = s.completed ? `<span class="stars" aria-hidden="true">${starRow(s.stars, 18)}</span>` : "";
     return `
     <li class="path-item ${side}">
       ${bubble}
@@ -114,11 +177,12 @@ window.App = window.App || {};
     const info = P.levelInfo(profile.xp);
     const ratio = Math.round(info.ratio * 100);
     const streakText = streak > 0
-      ? `Sequência de ${plural(streak, "dia", "dias")}! Não quebre a corrente 🔥`
-      : "Complete uma lição hoje e acenda sua sequência 🔥";
+      ? `Sequência de ${plural(streak, "dia", "dias")}! Não quebre a corrente.`
+      : "Complete uma lição hoje e acenda sua sequência!";
+    const tier = A.levelTier(info.level);
     const cta = next
       ? `<button type="button" class="btn btn-primary btn-block btn-xl" data-action="go" data-arg="#/lesson/${next.lesson.id}">Continuar: ${esc(next.lesson.title)} →</button>`
-      : `<p class="done-note">🎉 Trilha concluída! Treine a revisão e os simulados para manter o nível.</p>`;
+      : `<p class="done-note">Trilha concluída! Treine a revisão e os simulados para manter o nível.</p>`;
 
     const units = App.Data.units.map((unit, idx) => {
       const items = states.filter((s) => s.lesson.unitId === unit.id);
@@ -126,7 +190,7 @@ window.App = window.App || {};
       return `
       <section class="unit unit-${unit.color}" aria-labelledby="unit-${unit.id}">
         <header class="unit-banner">
-          <span class="unit-emoji" aria-hidden="true">${unit.emoji}</span>
+          <span class="unit-emoji" aria-hidden="true">${A.UNIT_ICONS[unit.id] ? icon(A.UNIT_ICONS[unit.id], 38) : esc(unit.emoji)}</span>
           <div class="unit-text">
             <small>UNIDADE ${idx + 1}</small>
             <h2 id="unit-${unit.id}">${esc(unit.title)}</h2>
@@ -140,16 +204,21 @@ window.App = window.App || {};
     return `
     <section class="page">
       <div class="card hero">
-        <div class="hero-mascot">${mascot(streak > 0 ? "cheer" : "happy", 110)}</div>
+        <div class="hero-mascot">${mascot(streak > 0 ? "streak" : "encourage", 120)}</div>
         <div class="hero-text">
           <h1 tabindex="-1">Olá${profile.name ? `, ${esc(profile.name)}` : ""}! ${esc(profile.avatar)}</h1>
           <div class="speech">${esc(streakText)}</div>
-          <p class="eyebrow">NÍVEL ${info.level}</p>
-          <div class="bar xp" role="progressbar" aria-label="Progresso até o nível ${info.level + 1}"
+          <div class="hero-level">
+            ${A.levelEmblem(info.level, 52)}
+            <div class="hero-level-text">
+              <p class="eyebrow">NÍVEL ${info.level} · ${esc(tier.name.toUpperCase())}</p>
+              <div class="bar xp" role="progressbar" aria-label="Progresso até o nível ${info.level + 1}"
             aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ratio}">
             <span style="width:${ratio}%"></span>
           </div>
-          <small class="muted">${info.into} de ${info.span} XP para o nível ${info.level + 1}</small>
+              <small class="muted">${info.into} de ${info.span} XP para o nível ${info.level + 1}</small>
+            </div>
+          </div>
         </div>
         <div class="hero-cta">${cta}</div>
       </div>
@@ -161,21 +230,19 @@ window.App = window.App || {};
     const blocks = lesson.theory.map((b) => typeof b === "string"
       ? `<p>${esc(b)}</p>`
       : `<div class="example"><strong>Exemplo</strong><p>${esc(b.example)}</p></div>`).join("");
-    const hearts = profile.hearts > 0
-      ? `❤️ ${profile.hearts} ${profile.hearts === 1 ? "vida disponível" : "vidas disponíveis"}`
-      : "Sem vidas no momento. Elas voltam com o tempo.";
     return `
     <section class="page narrow">
       <a class="back" href="#/">← Voltar à trilha</a>
       <div class="theory-head">
-        ${mascot("idle", 96)}
+        ${mascot("study", 100)}
         <div>
           <p class="eyebrow">${esc(lesson.unitTitle)} · LIÇÃO ${lesson.number}</p>
           <h1 tabindex="-1">${esc(lesson.title)}</h1>
         </div>
       </div>
       <article class="card theory">${blocks}</article>
-      <p class="muted center">${plural(lesson.questions.length, "exercício", "exercícios")} · até 20 XP ao concluir · ${hearts}</p>
+      <p class="muted center">${plural(lesson.questions.length, "exercício", "exercícios")} · até 20 XP ao concluir</p>
+      <p class="muted center hearts-line" data-hearts-live="theory">${heartsLive("theory", profile, Date.now())}</p>
       <button type="button" class="btn btn-primary btn-block btn-xl" data-action="start-lesson" data-arg="${lesson.id}">Começar exercícios</button>
     </section>`;
   }
@@ -185,7 +252,7 @@ window.App = window.App || {};
     <section class="page narrow">
       <a class="back" href="#/">← Voltar à trilha</a>
       <div class="card result">
-        <div class="result-icon" aria-hidden="true">🔒</div>
+        <div class="result-hero">${mascot("idle", 120, "lumi")}<span class="emblem" aria-hidden="true">${icon("lock", 44)}</span></div>
         <h1 tabindex="-1">Lição bloqueada</h1>
         <p class="muted">Conclua a lição anterior para desbloquear "${esc(lesson.title)}".</p>
         <a class="btn btn-primary" href="#/">Ir para a trilha</a>
@@ -217,13 +284,13 @@ window.App = window.App || {};
     }).join("");
 
     const topRight = kind === "lesson"
-      ? `<span class="chip chip-hearts" aria-label="${profile.hearts} vidas"><span aria-hidden="true">❤️</span> <b>${profile.hearts}</b></span>`
+      ? `<span data-hearts-live="quiz">${heartsLive("quiz", profile, now)}</span>`
       : kind === "simulado"
-        ? `<span class="chip" aria-label="Tempo decorrido">⏱ <b data-since="${s.startedAt}">${formatClock(now - s.startedAt)}</b></span>`
-        : `<span class="chip chip-review">♻️ Revisão</span>`;
+        ? `<span class="chip" aria-label="Tempo decorrido">${icon("timer", 20)} <b data-since="${s.startedAt}">${formatClock(now - s.startedAt)}</b></span>`
+        : `<span class="chip chip-review">${icon("review", 20)} Revisão</span>`;
 
     const hint = s.hintUsed && !s.verified
-      ? `<div class="hint" role="note"><b>💡 Dica:</b> ${esc(q.hint)}</div>`
+      ? `<div class="hint" role="note">${mascot("idle", 48, "lumi", { label: "" })}<p><b>Dica do Lumi:</b> ${esc(q.hint)}</p></div>`
       : "";
 
     let bottom;
@@ -231,18 +298,23 @@ window.App = window.App || {};
       const canHint = kind !== "simulado" && !s.hintUsed;
       bottom = `
       <div class="footer">
-        ${canHint ? `<button type="button" class="btn btn-ghost" data-action="hint">💡 Dica</button>` : "<span></span>"}
+        ${canHint ? `<button type="button" class="btn btn-ghost" data-action="hint">${icon("bulb", 22)} Dica</button>` : "<span></span>"}
         <button type="button" class="btn btn-primary btn-xl" data-action="verify" ${s.selected === null ? "disabled" : ""}>
           ${kind === "simulado" ? "Confirmar" : "Verificar"}
         </button>
       </div>`;
     } else {
       const ok = s.lastCorrect;
+      const onFire = ok && s.combo >= 3;
+      const pose = ok ? (onFire ? "streak" : "correct") : "wrong";
+      const title = ok
+        ? (onFire ? `Sequência de ${s.combo} acertos!` : "Isso aí! Correto!")
+        : "Ops! Não foi dessa vez.";
       bottom = `
       <div class="feedback ${ok ? "ok" : "no"}" role="status" aria-live="polite">
-        <div class="fb-mascot">${mascot(ok ? "cheer" : "sad", 64)}</div>
+        <div class="fb-mascot">${mascot(pose, 76)}</div>
         <div class="fb-text">
-          <p class="fb-title">${ok ? "Isso aí! Correto!" : "Ops! Não foi dessa vez."}</p>
+          <p class="fb-title">${title}</p>
           <p>${esc(q.explain)}</p>
         </div>
       </div>
@@ -257,7 +329,7 @@ window.App = window.App || {};
     return `
     <section class="page quiz-page">
       <header class="quiz-top">
-        <button type="button" class="icon-btn" data-action="quit" aria-label="Sair">✕</button>
+        <button type="button" class="icon-btn" data-action="quit" aria-label="Sair">${icon("close", 20)}</button>
         <div class="progress" role="progressbar" aria-label="Progresso da sessão"
           aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
           <span style="width:${progress}%"></span>
@@ -279,16 +351,17 @@ window.App = window.App || {};
     </section>`;
   }
 
-  function resultView(r) {
+  function resultView(r, profile) {
     const stars = typeof r.stars === "number"
       ? `<div class="stars big" role="img" aria-label="${r.stars} de 3 estrelas">${[0, 1, 2].map((i) =>
-          `<span class="star ${i < r.stars ? "on" : "off"}" style="animation-delay:${0.2 + i * 0.18}s">${i < r.stars ? "★" : "☆"}</span>`).join("")}</div>`
+          `<span class="star ${i < r.stars ? "on" : "off"}" style="animation-delay:${0.2 + i * 0.18}s">${icon(i < r.stars ? "star" : "star-empty", 52)}</span>`).join("")}</div>`
       : "";
     const level = r.leveledUp
-      ? `<div class="level-up" role="status">🎉 Você subiu para o nível ${r.leveledUp}!</div>`
+      ? `<div class="level-up" role="status">${A.levelEmblem(r.leveledUp, 76)}
+           <div><b>Você subiu para o nível ${r.leveledUp}!</b><span>Novo emblema: ${esc(A.levelTier(r.leveledUp).name)}</span></div></div>`
       : "";
-    const countdown = r.until
-      ? `<p class="muted">Próxima vida em <b data-until="${r.until}">--:--</b></p>`
+    const countdown = r.heartClock
+      ? `<p class="muted" data-heart-line>${heartLine(P.heartsStatus(profile, Date.now()))}</p>`
       : "";
     const stats = (r.stats || [])
       .map((s) => `<div><strong>${esc(s.value)}</strong><span>${esc(s.label)}</span></div>`)
@@ -296,7 +369,7 @@ window.App = window.App || {};
     const badges = r.newBadges && r.newBadges.length
       ? `<div class="unlocked">
            <p class="eyebrow">CONQUISTAS DESBLOQUEADAS</p>
-           <div class="pill-row">${r.newBadges.map((b) => `<span class="pill">${b.icon} ${esc(b.name)}</span>`).join("")}</div>
+           <div class="pill-row">${r.newBadges.map((b) => `<span class="pill">${A.badgeArt(b.id, true, 30)} ${esc(b.name)}</span>`).join("")}</div>
          </div>`
       : "";
     const actions = r.actions.map((a) => {
@@ -310,8 +383,8 @@ window.App = window.App || {};
     <section class="page narrow">
       <div class="card result">
         <div class="result-hero">
-          ${mascot(r.mood || "happy", 130)}
-          <span class="emblem" aria-hidden="true">${r.icon}</span>
+          ${mascot(r.leveledUp ? "levelup" : r.mood || "happy", 140, r.who || "raiz")}
+          ${r.icon ? `<span class="emblem" aria-hidden="true">${icon(r.icon, 46)}</span>` : ""}
         </div>
         <p class="eyebrow">${esc(r.eyebrow)}</p>
         <h1 tabindex="-1">${esc(r.title)}</h1>
@@ -331,14 +404,14 @@ window.App = window.App || {};
     return `
     <section class="page narrow">
       <div class="theory-head">
-        ${mascot("idle", 96)}
+        ${mascot("encourage", 100, "brasa")}
         <div>
           <p class="eyebrow">REVISÃO</p>
           <h1 tabindex="-1">Treine o que mais erra</h1>
         </div>
       </div>
       <p class="muted">Montamos 10 questões priorizando os erros que ainda não foram superados. A revisão não consome vidas.</p>
-      <div class="card"><p>Questões com erro pendente: <b>${pending}</b></p></div>
+      <div class="card info-row">${icon("review", 30)}<p>Questões com erro pendente: <b>${pending}</b></p></div>
       <button type="button" class="btn btn-primary btn-block btn-xl" data-action="start-practice" data-arg="">Começar revisão</button>
     </section>`;
   }
@@ -351,7 +424,7 @@ window.App = window.App || {};
     return `
     <section class="page narrow">
       <div class="theory-head">
-        ${mascot("cheer", 96)}
+        ${mascot("study", 100, "lumi")}
         <div>
           <p class="eyebrow">ESTILO ENEM</p>
           <h1 tabindex="-1">Simulado</h1>
@@ -386,11 +459,22 @@ window.App = window.App || {};
         }).join("")
       : `<li class="muted">Responda algumas questões para ver seu desempenho por assunto.</li>`;
 
+    const tier = A.levelTier(info.level);
+    const ratio = Math.round(info.ratio * 100);
+    const journey = A.TIERS.map((tt, i) => {
+      const lv = i + 1;
+      const reached = info.level >= lv;
+      const label = i === A.TIERS.length - 1 ? `Nv ${lv}+` : `Nv ${lv}`;
+      return `<li class="${reached ? "reached" : ""}${tier.index === i ? " current" : ""}">
+        ${A.levelEmblem(lv, 58, { locked: !reached, label: `Nível ${lv}: ${tt.name}${reached ? "" : " (bloqueado)"}` })}
+        <b>${esc(tt.name)}</b><small>${label}</small></li>`;
+    }).join("");
+
     const badges = P.BADGES.map((b) => {
       const on = !!profile.badges[b.id];
       return `
       <div class="badge-tile ${on ? "on" : ""}">
-        <span aria-hidden="true">${on ? b.icon : "🔒"}</span>
+        <span class="badge-art">${A.badgeArt(b.id, on, 64)}</span>
         <b>${esc(b.name)}</b>
         <small>${esc(b.desc)}</small>
       </div>`;
@@ -406,7 +490,7 @@ window.App = window.App || {};
     return `
     <section class="page profile">
       <div class="theory-head">
-        ${mascot("happy", 88)}
+        ${mascot("happy", 96)}
         <div>
           <p class="eyebrow">PERFIL · NÍVEL ${info.level}</p>
           <h1 tabindex="-1">Seu progresso</h1>
@@ -427,30 +511,44 @@ window.App = window.App || {};
 
       <div class="card settings-row">
         <span>Efeitos sonoros</span>
-        <button type="button" class="btn btn-ghost" data-action="toggle-sound" aria-pressed="${sound}">${sound ? "🔊 Ligados" : "🔇 Desligados"}</button>
+        <button type="button" class="btn btn-ghost" data-action="toggle-sound" aria-pressed="${sound}">${icon(sound ? "sound" : "sound-off", 22)} ${sound ? "Ligados" : "Desligados"}</button>
       </div>
+
+      <div class="card level-card">
+        ${A.levelEmblem(info.level, 104)}
+        <div class="level-card-text">
+          <p class="eyebrow">SEU NÍVEL</p>
+          <h2>Nível ${info.level} · ${esc(tier.name)}</h2>
+          <div class="bar xp" role="progressbar" aria-label="Progresso até o nível ${info.level + 1}"
+            aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ratio}"><span style="width:${ratio}%"></span></div>
+          <small class="muted">${info.into} de ${info.span} XP para o nível ${info.level + 1}</small>
+        </div>
+      </div>
+
+      <h2 class="h-ico">${icon("level", 28)} Jornada de níveis</h2>
+      <ol class="journey">${journey}</ol>
 
       <div class="stat-grid">
-        <div class="card stat"><b>${profile.xp}</b><span>XP total</span></div>
-        <div class="card stat"><b>${info.level}</b><span>Nível</span></div>
-        <div class="card stat"><b>${P.currentStreak(profile, now)}</b><span>Sequência atual</span></div>
-        <div class="card stat"><b>${profile.bestStreak}</b><span>Maior sequência</span></div>
-        <div class="card stat"><b>${t.answered}</b><span>Questões respondidas</span></div>
-        <div class="card stat"><b>${t.correct}</b><span>Acertos</span></div>
-        <div class="card stat"><b>${t.wrong}</b><span>Erros</span></div>
-        <div class="card stat"><b>${percent(t.correct, t.answered)}%</b><span>Taxa de acerto</span></div>
+        <div class="card stat">${icon("star", 30)}<b>${profile.xp}</b><span>XP total</span></div>
+        <div class="card stat">${icon("level", 30)}<b>${info.level}</b><span>Nível</span></div>
+        <div class="card stat">${icon("flame", 30)}<b>${P.currentStreak(profile, now)}</b><span>Sequência atual</span></div>
+        <div class="card stat">${icon("trophy", 30)}<b>${profile.bestStreak}</b><span>Maior sequência</span></div>
+        <div class="card stat">${icon("paper", 30)}<b>${t.answered}</b><span>Questões respondidas</span></div>
+        <div class="card stat">${icon("check", 30)}<b>${t.correct}</b><span>Acertos</span></div>
+        <div class="card stat">${icon("close", 30)}<b>${t.wrong}</b><span>Erros</span></div>
+        <div class="card stat">${icon("target", 30)}<b>${percent(t.correct, t.answered)}%</b><span>Taxa de acerto</span></div>
       </div>
 
-      <h2>Desempenho por assunto</h2>
+      <h2 class="h-ico">${icon("target", 28)} Desempenho por assunto</h2>
       <div class="card">
         <ul class="topic-list">${topicRows}</ul>
         ${topics.length ? `<button type="button" class="btn btn-ghost btn-block" data-action="go" data-arg="#/practice">Revisar meus erros →</button>` : ""}
       </div>
 
-      <h2>Conquistas</h2>
+      <h2 class="h-ico">${icon("medal", 28)} Conquistas</h2>
       <div class="badge-grid">${badges}</div>
 
-      <h2>Simulados</h2>
+      <h2 class="h-ico">${icon("podium", 28)} Placar dos simulados</h2>
       <div class="card"><ul class="history">${history}</ul></div>
 
       <div class="danger-zone">
@@ -463,7 +561,7 @@ window.App = window.App || {};
     return `
     <section class="page narrow">
       <div class="card result">
-        <div class="result-icon" aria-hidden="true">🧭</div>
+        <div class="result-hero">${mascot("wrong", 120, "lumi")}<span class="emblem" aria-hidden="true">${icon("u-compass", 44)}</span></div>
         <h1 tabindex="-1">Página não encontrada</h1>
         <a class="btn btn-primary" href="#/">Voltar à trilha</a>
       </div>
@@ -472,7 +570,12 @@ window.App = window.App || {};
 
   App.Views = {
     mascot,
+    icon,
     statsChips,
+    heartsChip,
+    heartsLive,
+    heartSubText,
+    heartLine,
     onboardingView,
     homeView,
     theoryView,
