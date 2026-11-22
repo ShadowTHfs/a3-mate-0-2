@@ -2,7 +2,7 @@
 window.App = window.App || {};
 (function (App) {
   "use strict";
-  const { Store, Progress: P, Quiz: Q, Views: V, Utils: U } = App;
+  const { Store, Progress: P, Quiz: Q, Views: V, Utils: U, Sound, Fx } = App;
 
   const state = {
     profile: null,
@@ -189,6 +189,7 @@ window.App = window.App || {};
 
   function onSelect(i) {
     if (state.session && Q.select(state.session, i)) {
+      Sound.play("tap");
       render({ focus: `.answer[data-arg="${i}"]` });
     }
   }
@@ -219,7 +220,9 @@ window.App = window.App || {};
     persist();
 
     if (s.mode === "simulado") return onNext();
+    Sound.play(res.correct ? "correct" : "wrong");
     render({ focus: '[data-action="next"]' });
+    if (rec.xp > 0) Fx.floatText(document.querySelector(".feedback"), `+${rec.xp} XP`);
   }
 
   function onNext() {
@@ -249,9 +252,12 @@ window.App = window.App || {};
     const route = currentHash();
     const levelBefore = P.levelInfo(s.xpStart).level;
     let result;
+    let celebrate = false;
 
     if (outcome === "failed") {
       result = failedResult();
+      result.mood = "sad";
+      Sound.play("wrong");
     } else if (s.mode === "lesson") {
       const r = P.completeLesson(state.profile, s.lessonId, { mistakes: s.mistakes, now: t });
       s.xp += r.xp;
@@ -266,9 +272,11 @@ window.App = window.App || {};
             { label: "Voltar à trilha", to: "#/", primary: true },
             { label: "Refazer esta lição", action: "start-lesson", arg: s.lessonId },
           ];
+      celebrate = r.stars >= 2;
       result = {
         eyebrow: "LIÇÃO CONCLUÍDA",
-        icon: r.stars === 3 ? "🏆" : "✅",
+        icon: r.stars === 3 ? "🏆" : "⭐",
+        mood: r.stars === 3 ? "cheer" : "happy",
         title: r.stars === 3 ? "Lição perfeita!" : "Lição concluída!",
         subtitle: `${s.correctFirst} de ${s.total} acertos na primeira tentativa.`,
         stars: r.stars,
@@ -279,12 +287,14 @@ window.App = window.App || {};
         ],
         actions,
       };
+      Sound.play("complete");
     } else if (s.mode === "practice") {
       const r = P.completePractice(state.profile, { now: t });
       s.xp += r.xp;
       result = {
         eyebrow: "REVISÃO CONCLUÍDA",
         icon: "♻️",
+        mood: "happy",
         title: "Revisão concluída!",
         subtitle: `${s.correctFirst} de ${s.total} acertos na primeira tentativa.`,
         stats: [
@@ -297,14 +307,17 @@ window.App = window.App || {};
           { label: "Voltar à trilha", to: "#/" },
         ],
       };
+      Sound.play("complete");
     } else {
       const hits = s.correctFirst;
       const seconds = Math.round((t - s.startedAt) / 1000);
       const r = P.completeSimulado(state.profile, { hits, total: s.total, seconds, now: t });
       const pct = U.percent(hits, s.total);
+      celebrate = pct >= 60;
       result = {
         eyebrow: "SIMULADO CONCLUÍDO",
         icon: pct >= 80 ? "🏆" : pct >= 60 ? "🎯" : "📚",
+        mood: pct >= 60 ? "cheer" : "idle",
         title: pct >= 80 ? "Excelente desempenho!" : pct >= 60 ? "Bom trabalho!" : "Hora de reforçar a base",
         subtitle: `Você acertou ${hits} de ${s.total} na primeira tentativa.`,
         stats: [
@@ -318,10 +331,15 @@ window.App = window.App || {};
           { label: "Ver meu perfil", to: "#/profile" },
         ],
       };
+      Sound.play("complete");
     }
 
     const levelAfter = P.levelInfo(state.profile.xp).level;
-    if (levelAfter > levelBefore) result.leveledUp = levelAfter;
+    if (levelAfter > levelBefore) {
+      result.leveledUp = levelAfter;
+      celebrate = true;
+      setTimeout(() => Sound.play("levelUp"), 500);
+    }
     result.newBadges = P.evaluateBadges(state.profile, t);
     result.route = route;
 
@@ -329,6 +347,7 @@ window.App = window.App || {};
     state.session = null;
     state.result = result;
     render({ navigate: true });
+    if (celebrate) Fx.confetti();
   }
 
   /* ---------- Perfil ---------- */
@@ -364,6 +383,16 @@ window.App = window.App || {};
     render({ focus: `[data-arg="${emoji}"]` });
   }
 
+  function onToggleSound() {
+    state.profile.sound = state.profile.sound === false;
+    Sound.setEnabled(state.profile.sound);
+    persist();
+    render();
+    const btn = document.querySelector("[data-action=toggle-sound]");
+    if (btn) btn.focus({ preventScroll: true });
+    if (state.profile.sound) Sound.play("tap");
+  }
+
   function onReset() {
     if (!confirm("Apagar todo o progresso deste navegador? Isso não pode ser desfeito.")) return;
     state.profile = Store.reset(now());
@@ -389,6 +418,7 @@ window.App = window.App || {};
     next: onNext,
     quit: onQuit,
     "pick-avatar": onPickAvatar,
+    "toggle-sound": onToggleSound,
     "reset-progress": onReset,
   };
 
@@ -411,6 +441,7 @@ window.App = window.App || {};
   function init() {
     indexLessons();
     state.profile = Store.load(now());
+    Sound.setEnabled(state.profile.sound !== false);
     P.refillHearts(state.profile, now());
     if (!location.hash) history.replaceState(null, "", "#/");
     window.addEventListener("hashchange", () => {

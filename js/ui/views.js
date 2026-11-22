@@ -14,40 +14,78 @@ window.App = window.App || {};
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   const starsText = (n) => "★".repeat(n) + "☆".repeat(3 - n);
 
+  /* Xis, o mascote. Humor: happy | cheer | sad | idle */
+  function mascot(mood = "happy", size = 110) {
+    const mouth = {
+      happy: '<path class="m-stroke" d="M46 76 Q60 90 74 76"/>',
+      idle: '<path class="m-stroke" d="M50 78 Q60 84 70 78"/>',
+      cheer: '<path class="m-mouth" d="M44 74 Q60 100 76 74 Z"/>',
+      sad: '<path class="m-stroke" d="M48 88 Q60 78 72 88"/>',
+    }[mood] || '<path class="m-stroke" d="M46 76 Q60 90 74 76"/>';
+    const eyes = mood === "cheer"
+      ? '<path class="m-stroke" d="M34 54 Q42 42 50 54"/><path class="m-stroke" d="M70 54 Q78 42 86 54"/>'
+      : mood === "sad"
+        ? '<circle class="m-eye" cx="42" cy="54" r="6.5"/><circle class="m-eye" cx="78" cy="54" r="6.5"/>'
+          + '<path class="m-stroke" d="M32 44 L50 48"/><path class="m-stroke" d="M88 44 L70 48"/>'
+        : '<circle class="m-eye" cx="42" cy="52" r="7"/><circle class="m-eye" cx="78" cy="52" r="7"/>'
+          + '<circle class="m-pupil" cx="44" cy="54" r="3"/><circle class="m-pupil" cx="80" cy="54" r="3"/>';
+    return `
+    <svg class="mascot mascot-${mood}" viewBox="0 0 120 124" width="${size}" height="${size}" role="img" aria-label="Xis, o mascote">
+      <ellipse class="m-shadow" cx="60" cy="119" rx="34" ry="5"/>
+      <g class="m-arm m-arm-l"><ellipse cx="11" cy="74" rx="9" ry="15"/></g>
+      <g class="m-arm m-arm-r"><ellipse cx="109" cy="74" rx="9" ry="15"/></g>
+      <g class="m-body">
+        <path class="m-fill" d="M60 8C92 8 110 34 108 66C106 98 86 112 60 112C34 112 14 98 12 66C10 34 28 8 60 8Z"/>
+        <ellipse class="m-shine" cx="42" cy="32" rx="13" ry="7"/>
+        <circle class="m-cheek" cx="28" cy="72" r="7"/>
+        <circle class="m-cheek" cx="92" cy="72" r="7"/>
+        ${eyes}
+        ${mouth}
+        <text class="m-sigma" x="60" y="104" text-anchor="middle">∑</text>
+      </g>
+    </svg>`;
+  }
+
+  function soundButton(profile) {
+    const on = profile.sound !== false;
+    return `<button type="button" class="chip chip-btn" data-action="toggle-sound" aria-pressed="${on}"
+      aria-label="Efeitos sonoros ${on ? "ligados" : "desligados"}" title="Efeitos sonoros">${on ? "🔊" : "🔇"}</button>`;
+  }
+
   function statsChips(profile, now) {
     const info = P.levelInfo(profile.xp);
     const streak = P.currentStreak(profile, now);
     return `
-      <span class="chip chip-streak" title="Sequência de dias">🔥 <b>${streak}</b></span>
-      <span class="chip chip-xp" title="XP total">⭐ <b>${profile.xp}</b><small> · Nv ${info.level}</small></span>
-      <span class="chip chip-hearts" title="Vidas">❤️ <b>${profile.hearts}</b></span>`;
+      <span class="chip chip-streak" title="Sequência de dias"><span aria-hidden="true">🔥</span> <b>${streak}</b></span>
+      <span class="chip chip-xp" title="XP total"><span aria-hidden="true">⭐</span> <b>${profile.xp}</b><small> · Nv ${info.level}</small></span>
+      <span class="chip chip-hearts" title="Vidas"><span aria-hidden="true">❤️</span> <b>${profile.hearts}</b></span>
+      ${soundButton(profile)}`;
   }
 
-  function avatarButtons(selected, extraClass = "") {
+  function avatarButtons(selected) {
     return App.AVATARS.map((emoji) => `
-      <button type="button" class="avatar-opt ${extraClass}" data-action="pick-avatar" data-arg="${emoji}"
+      <button type="button" class="avatar-opt" data-action="pick-avatar" data-arg="${emoji}"
         aria-pressed="${emoji === selected}" aria-label="Avatar ${emoji}">${emoji}</button>`).join("");
   }
 
   function onboardingView(avatar, name) {
     return `
     <section class="page narrow onboard">
-      <div class="onboard-hero" aria-hidden="true">${esc(avatar)}</div>
-      <p class="eyebrow">BEM-VINDO</p>
-      <h1 tabindex="-1">Vamos começar o seu desafio?</h1>
-      <p class="muted">Escolha um nome e um avatar. Seu progresso fica salvo neste navegador.</p>
+      <div class="onboard-hero">${mascot("cheer", 150)}</div>
+      <div class="speech">Oi! Eu sou o Xis. Vamos montar a sua trilha de álgebra?</div>
+      <h1 tabindex="-1">Bem-vindo ao Desafio!</h1>
       <form class="card form" data-form="onboarding">
         <label for="name">Como podemos te chamar?</label>
         <input id="name" name="name" maxlength="24" autocomplete="nickname"
           placeholder="Seu nome ou apelido" value="${esc(name)}" />
-        <span class="label" id="avatar-label">Avatar</span>
+        <span class="label" id="avatar-label">Escolha seu avatar</span>
         <div class="avatar-grid" role="group" aria-labelledby="avatar-label">${avatarButtons(avatar)}</div>
-        <button class="btn btn-primary btn-block" type="submit">Entrar na trilha →</button>
+        <button class="btn btn-primary btn-block btn-xl" type="submit">Começar a jogar →</button>
       </form>
     </section>`;
   }
 
-  function nodeHtml(s, i) {
+  function nodeHtml(s, i, isNext) {
     const cls = s.completed ? "done" : s.unlocked ? "open" : "locked";
     const side = i % 2 === 0 ? "left" : "right";
     const content = s.completed ? "✓" : s.unlocked ? s.lesson.number : "🔒";
@@ -55,14 +93,15 @@ window.App = window.App || {};
       ? `, concluída, ${s.stars} de 3 estrelas`
       : s.unlocked ? "" : ", bloqueada";
     const attrs = s.unlocked ? `data-action="go" data-arg="#/lesson/${s.lesson.id}"` : "disabled";
-    const stars = s.completed
-      ? `<span class="stars" aria-hidden="true">${starsText(s.stars)}</span>`
-      : "";
+    const crown = s.stars === 3 ? '<span class="crown" aria-hidden="true">👑</span>' : "";
+    const bubble = isNext ? '<span class="start-bubble" aria-hidden="true">COMEÇAR</span>' : "";
+    const stars = s.completed ? `<span class="stars" aria-hidden="true">${starsText(s.stars)}</span>` : "";
     return `
     <li class="path-item ${side}">
+      ${bubble}
       <button type="button" class="node ${cls}" ${attrs}
         aria-label="Lição ${s.lesson.number}: ${esc(s.lesson.title)}${aria}">
-        <span aria-hidden="true">${content}</span>
+        ${crown}<span aria-hidden="true">${content}</span>
       </button>
       <span class="node-label">${esc(s.lesson.title)}</span>
       ${stars}
@@ -75,37 +114,38 @@ window.App = window.App || {};
     const info = P.levelInfo(profile.xp);
     const ratio = Math.round(info.ratio * 100);
     const streakText = streak > 0
-      ? `Você está em uma sequência de ${plural(streak, "dia", "dias")}. Continue assim!`
-      : "Complete uma lição hoje para começar sua sequência.";
+      ? `Sequência de ${plural(streak, "dia", "dias")}! Não quebre a corrente 🔥`
+      : "Complete uma lição hoje e acenda sua sequência 🔥";
     const cta = next
-      ? `<button type="button" class="btn btn-primary btn-block" data-action="go" data-arg="#/lesson/${next.lesson.id}">Continuar: ${esc(next.lesson.title)} →</button>`
-      : `<p class="done-note">🎉 Você concluiu toda a trilha! Use a Revisão e o Simulado para manter o nível.</p>`;
+      ? `<button type="button" class="btn btn-primary btn-block btn-xl" data-action="go" data-arg="#/lesson/${next.lesson.id}">Continuar: ${esc(next.lesson.title)} →</button>`
+      : `<p class="done-note">🎉 Trilha concluída! Treine a revisão e os simulados para manter o nível.</p>`;
 
-    const units = App.Data.units.map((unit) => {
+    const units = App.Data.units.map((unit, idx) => {
       const items = states.filter((s) => s.lesson.unitId === unit.id);
       const done = items.filter((s) => s.completed).length;
       return `
       <section class="unit unit-${unit.color}" aria-labelledby="unit-${unit.id}">
-        <header class="unit-head">
+        <header class="unit-banner">
           <span class="unit-emoji" aria-hidden="true">${unit.emoji}</span>
-          <div>
+          <div class="unit-text">
+            <small>UNIDADE ${idx + 1}</small>
             <h2 id="unit-${unit.id}">${esc(unit.title)}</h2>
-            <p>${done} de ${items.length} lições concluídas</p>
           </div>
+          <span class="unit-count">${done}/${items.length}</span>
         </header>
-        <ol class="path">${items.map((s, i) => nodeHtml(s, i)).join("")}</ol>
+        <ol class="path">${items.map((s, i) => nodeHtml(s, i, s === next)).join("")}</ol>
       </section>`;
     }).join("");
 
     return `
     <section class="page">
       <div class="card hero">
-        <div class="hero-avatar" aria-hidden="true">${esc(profile.avatar)}</div>
+        <div class="hero-mascot">${mascot(streak > 0 ? "cheer" : "happy", 110)}</div>
         <div class="hero-text">
+          <h1 tabindex="-1">Olá${profile.name ? `, ${esc(profile.name)}` : ""}! ${esc(profile.avatar)}</h1>
+          <div class="speech">${esc(streakText)}</div>
           <p class="eyebrow">NÍVEL ${info.level}</p>
-          <h1 tabindex="-1">Olá${profile.name ? `, ${esc(profile.name)}` : ""}! 👋</h1>
-          <p class="muted">${esc(streakText)}</p>
-          <div class="bar" role="progressbar" aria-label="Progresso até o nível ${info.level + 1}"
+          <div class="bar xp" role="progressbar" aria-label="Progresso até o nível ${info.level + 1}"
             aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ratio}">
             <span style="width:${ratio}%"></span>
           </div>
@@ -127,11 +167,16 @@ window.App = window.App || {};
     return `
     <section class="page narrow">
       <a class="back" href="#/">← Voltar à trilha</a>
-      <p class="eyebrow">${esc(lesson.unitTitle)} · LIÇÃO ${lesson.number}</p>
-      <h1 tabindex="-1">${esc(lesson.title)}</h1>
+      <div class="theory-head">
+        ${mascot("idle", 96)}
+        <div>
+          <p class="eyebrow">${esc(lesson.unitTitle)} · LIÇÃO ${lesson.number}</p>
+          <h1 tabindex="-1">${esc(lesson.title)}</h1>
+        </div>
+      </div>
       <article class="card theory">${blocks}</article>
       <p class="muted center">${plural(lesson.questions.length, "exercício", "exercícios")} · até 20 XP ao concluir · ${hearts}</p>
-      <button type="button" class="btn btn-primary btn-block" data-action="start-lesson" data-arg="${lesson.id}">Começar exercícios</button>
+      <button type="button" class="btn btn-primary btn-block btn-xl" data-action="start-lesson" data-arg="${lesson.id}">Começar exercícios</button>
     </section>`;
   }
 
@@ -172,10 +217,10 @@ window.App = window.App || {};
     }).join("");
 
     const topRight = kind === "lesson"
-      ? `<span class="chip chip-hearts" aria-label="${profile.hearts} vidas">❤️ <b>${profile.hearts}</b></span>`
+      ? `<span class="chip chip-hearts" aria-label="${profile.hearts} vidas"><span aria-hidden="true">❤️</span> <b>${profile.hearts}</b></span>`
       : kind === "simulado"
         ? `<span class="chip" aria-label="Tempo decorrido">⏱ <b data-since="${s.startedAt}">${formatClock(now - s.startedAt)}</b></span>`
-        : `<span class="chip">Revisão</span>`;
+        : `<span class="chip chip-review">♻️ Revisão</span>`;
 
     const hint = s.hintUsed && !s.verified
       ? `<div class="hint" role="note"><b>💡 Dica:</b> ${esc(q.hint)}</div>`
@@ -187,23 +232,28 @@ window.App = window.App || {};
       bottom = `
       <div class="footer">
         ${canHint ? `<button type="button" class="btn btn-ghost" data-action="hint">💡 Dica</button>` : "<span></span>"}
-        <button type="button" class="btn btn-primary" data-action="verify" ${s.selected === null ? "disabled" : ""}>
+        <button type="button" class="btn btn-primary btn-xl" data-action="verify" ${s.selected === null ? "disabled" : ""}>
           ${kind === "simulado" ? "Confirmar" : "Verificar"}
         </button>
       </div>`;
     } else {
+      const ok = s.lastCorrect;
       bottom = `
-      <div class="feedback ${s.lastCorrect ? "ok" : "no"}" role="status" aria-live="polite">
-        <p class="fb-title">${s.lastCorrect ? "✓ Correto!" : "✕ Não foi dessa vez."}</p>
-        <p>${esc(q.explain)}</p>
+      <div class="feedback ${ok ? "ok" : "no"}" role="status" aria-live="polite">
+        <div class="fb-mascot">${mascot(ok ? "cheer" : "sad", 64)}</div>
+        <div class="fb-text">
+          <p class="fb-title">${ok ? "Isso aí! Correto!" : "Ops! Não foi dessa vez."}</p>
+          <p>${esc(q.explain)}</p>
+        </div>
       </div>
       <div class="footer">
-        <button type="button" class="btn btn-primary btn-block" data-action="next">
+        <button type="button" class="btn btn-primary btn-block btn-xl" data-action="next">
           ${s.outOfHearts ? "Ver resultado" : "Continuar"} →
         </button>
       </div>`;
     }
 
+    const shake = s.verified && !s.lastCorrect ? " card-shake" : "";
     return `
     <section class="page quiz-page">
       <header class="quiz-top">
@@ -214,7 +264,7 @@ window.App = window.App || {};
         </div>
         ${topRight}
       </header>
-      <article class="card question">
+      <article class="card question${shake}">
         <div class="meta">
           <span class="badge ${diff.cls}">${diff.label}</span>
           <span class="topic">${esc(q.topic)}</span>
@@ -231,7 +281,8 @@ window.App = window.App || {};
 
   function resultView(r) {
     const stars = typeof r.stars === "number"
-      ? `<div class="stars big" role="img" aria-label="${r.stars} de 3 estrelas">${starsText(r.stars)}</div>`
+      ? `<div class="stars big" role="img" aria-label="${r.stars} de 3 estrelas">${[0, 1, 2].map((i) =>
+          `<span class="star ${i < r.stars ? "on" : "off"}" style="animation-delay:${0.2 + i * 0.18}s">${i < r.stars ? "★" : "☆"}</span>`).join("")}</div>`
       : "";
     const level = r.leveledUp
       ? `<div class="level-up" role="status">🎉 Você subiu para o nível ${r.leveledUp}!</div>`
@@ -251,14 +302,17 @@ window.App = window.App || {};
     const actions = r.actions.map((a) => {
       const action = a.action || "go";
       const arg = a.action ? (a.arg ?? "") : a.to;
-      return `<button type="button" class="btn ${a.primary ? "btn-primary" : "btn-ghost"} btn-block"
+      return `<button type="button" class="btn ${a.primary ? "btn-primary btn-xl" : "btn-ghost"} btn-block"
         data-action="${action}" data-arg="${esc(arg)}">${esc(a.label)}</button>`;
     }).join("");
 
     return `
     <section class="page narrow">
       <div class="card result">
-        <div class="result-icon" aria-hidden="true">${r.icon}</div>
+        <div class="result-hero">
+          ${mascot(r.mood || "happy", 130)}
+          <span class="emblem" aria-hidden="true">${r.icon}</span>
+        </div>
         <p class="eyebrow">${esc(r.eyebrow)}</p>
         <h1 tabindex="-1">${esc(r.title)}</h1>
         <p class="muted">${esc(r.subtitle)}</p>
@@ -276,11 +330,16 @@ window.App = window.App || {};
     const pending = bank.filter((q) => profile.mistakes[q.id]).length;
     return `
     <section class="page narrow">
-      <p class="eyebrow">REVISÃO</p>
-      <h1 tabindex="-1">Treine o que mais erra</h1>
+      <div class="theory-head">
+        ${mascot("idle", 96)}
+        <div>
+          <p class="eyebrow">REVISÃO</p>
+          <h1 tabindex="-1">Treine o que mais erra</h1>
+        </div>
+      </div>
       <p class="muted">Montamos 10 questões priorizando os erros que ainda não foram superados. A revisão não consome vidas.</p>
       <div class="card"><p>Questões com erro pendente: <b>${pending}</b></p></div>
-      <button type="button" class="btn btn-primary btn-block" data-action="start-practice" data-arg="">Começar revisão</button>
+      <button type="button" class="btn btn-primary btn-block btn-xl" data-action="start-practice" data-arg="">Começar revisão</button>
     </section>`;
   }
 
@@ -291,8 +350,13 @@ window.App = window.App || {};
       : "Você ainda não fez nenhum simulado.";
     return `
     <section class="page narrow">
-      <p class="eyebrow">ESTILO ENEM</p>
-      <h1 tabindex="-1">Simulado</h1>
+      <div class="theory-head">
+        ${mascot("cheer", 96)}
+        <div>
+          <p class="eyebrow">ESTILO ENEM</p>
+          <h1 tabindex="-1">Simulado</h1>
+        </div>
+      </div>
       <p class="muted">10 questões sorteadas do banco, com cronômetro. Não há dicas, não se usam vidas e as respostas só são corrigidas no final.</p>
       <div class="card">
         <ul class="rules">
@@ -302,7 +366,7 @@ window.App = window.App || {};
         </ul>
         <p class="muted">${esc(lastText)}</p>
       </div>
-      <button type="button" class="btn btn-primary btn-block" data-action="start-simulado" data-arg="">Começar simulado</button>
+      <button type="button" class="btn btn-primary btn-block btn-xl" data-action="start-simulado" data-arg="">Começar simulado</button>
     </section>`;
   }
 
@@ -337,10 +401,17 @@ window.App = window.App || {};
           <li><span>${esc(s.date)}</span><b>${s.hits} de ${s.total}</b><span>${formatClock(s.seconds * 1000)}</span></li>`).join("")
       : `<li class="muted">Nenhum simulado ainda.</li>`;
 
+    const sound = profile.sound !== false;
+
     return `
     <section class="page profile">
-      <p class="eyebrow">PERFIL</p>
-      <h1 tabindex="-1">Seu progresso</h1>
+      <div class="theory-head">
+        ${mascot("happy", 88)}
+        <div>
+          <p class="eyebrow">PERFIL · NÍVEL ${info.level}</p>
+          <h1 tabindex="-1">Seu progresso</h1>
+        </div>
+      </div>
 
       <form class="card form inline" data-form="profile-name">
         <div class="avatar-current" aria-hidden="true">${esc(profile.avatar)}</div>
@@ -352,6 +423,11 @@ window.App = window.App || {};
       <div class="card">
         <span class="label" id="avatar-label-profile">Trocar avatar</span>
         <div class="avatar-grid" role="group" aria-labelledby="avatar-label-profile">${avatarButtons(profile.avatar)}</div>
+      </div>
+
+      <div class="card settings-row">
+        <span>Efeitos sonoros</span>
+        <button type="button" class="btn btn-ghost" data-action="toggle-sound" aria-pressed="${sound}">${sound ? "🔊 Ligados" : "🔇 Desligados"}</button>
       </div>
 
       <div class="stat-grid">
@@ -395,6 +471,7 @@ window.App = window.App || {};
   }
 
   App.Views = {
+    mascot,
     statsChips,
     onboardingView,
     homeView,

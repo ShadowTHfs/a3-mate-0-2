@@ -17,6 +17,7 @@ window.App = window.App || {};
       name: "",
       avatar: App.AVATARS[0],
       onboarded: false,
+      sound: true,
       createdAt: now,
       xp: 0,
       hearts: 5,

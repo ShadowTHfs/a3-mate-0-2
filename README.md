@@ -12,6 +12,7 @@ trilha de lições, vidas, XP, níveis, sequência de dias, conquistas e simulad
 - **Revisão de erros:** monta 10 questões priorizando o que você mais erra. Acertar uma questão depois de errá-la quita o erro pendente.
 - **Simulado:** 10 questões sorteadas, com cronômetro, sem dicas e sem vidas. Erros não voltam para a fila.
 - **Perfil:** nome, avatar, estatísticas gerais, desempenho por assunto (do mais fraco para o mais forte), conquistas e histórico de simulados.
+- **Visual de jogo:** o mascote Xis reage a cada resposta, a trilha tem conectores e a lição mais recente recebe o selo COMEÇAR, há confete ao concluir, XP flutuante e efeitos sonoros sintetizados (liga e desliga pelo 🔊).
 - **Acessibilidade:** navegação por teclado (teclas 1 a 4 para escolher, Enter para verificar e continuar), foco visível, leitores de tela (rótulos ARIA, status das respostas), suporte a `prefers-reduced-motion` e modo escuro automático.
 - **Responsivo:** no celular a navegação vai para a barra inferior.
 
@@ -75,6 +76,7 @@ O gabarito é guardado pelo texto da alternativa, e não pelo índice. Por isso 
 
 - O progresso é salvo apenas no navegador onde o app foi usado. Ele não sincroniza entre dispositivos.
 - Uma sessão em andamento não sobrevive a um recarregamento da página.
+- Os efeitos sonoros dependem do navegador liberar o áudio após o primeiro toque.
 - O banco tem 44 questões. Cada lição usa sempre as mesmas questões, na mesma ordem (só a ordem das alternativas muda).
 
 ## Próximos passos
