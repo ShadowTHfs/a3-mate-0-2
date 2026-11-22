@@ -421,14 +421,14 @@ function loadArt() {
   const ctx = { console };
   ctx.window = ctx;
   vm.createContext(ctx);
-  for (const file of ["js/core/utils.js", "js/ui/art.js"]) {
+  for (const file of ["js/core/utils.js", "js/ui/avatars.js", "js/ui/world.js", "js/ui/art.js"]) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, file), "utf8"), ctx, { filename: file });
   }
-  return ctx.App.Art;
+  return ctx.App;
 }
 
 test("arte: todos os personagens e poses geram SVG sem ícones faltando", () => {
-  const Art = loadArt();
+  const { Art, Avatars, World } = loadArt();
   const sprite = Art.spriteMarkup();
   const defined = new Set([...sprite.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
   const check = (svg, what) => {
@@ -446,10 +446,56 @@ test("arte: todos os personagens e poses geram SVG sem ícones faltando", () => 
     check(Art.badgeArt(id, true), `conquista ${id}`);
     check(Art.badgeArt(id, false), `conquista bloqueada ${id}`);
   }
+  for (const ch of Avatars.CHARACTERS) {
+    check(Avatars.sprite(ch.id, 100), `personagem ${ch.id}`);
+    check(Avatars.sprite(ch.id, 40, { portrait: true }), `retrato ${ch.id}`);
+  }
+  for (const unitId of Object.keys(World.WORLDS)) {
+    check(World.scene(unitId), `cenário ${unitId}`);
+    check(World.emblem(unitId), `medalhão ${unitId}`);
+    for (const v of [0, 1, 2]) check(World.island(unitId, v, 7), `ilha ${unitId}/${v}`);
+  }
+  check(World.lock(), "cadeado");
+  check(World.chest(false), "baú fechado");
+  check(World.chest(true), "baú aberto");
+});
+
+test("personagens: 8 originais, todos desenhados, sem emoji", () => {
+  const { Avatars } = loadArt();
+  const app = loadApp();
+  assert.equal(Avatars.CHARACTERS.length, 8);
+  assert.equal(JSON.stringify(Avatars.CHARACTERS.map((c) => c.id)), JSON.stringify(app.AVATARS));
+  const emoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+  for (const c of Avatars.CHARACTERS) {
+    assert.ok(c.name && c.role && c.bio, `${c.id} sem informações`);
+    assert.ok(!emoji.test(Avatars.sprite(c.id)), `${c.id} usa emoji`);
+  }
+});
+
+test("personagens: perfis antigos com emoji viram personagem ao carregar", () => {
+  const storage = memoryStorage();
+  const A = loadApp(storage);
+  assert.equal(A.normalizeAvatar("\u{1F916}"), "bit");
+  assert.equal(A.normalizeAvatar("\u{1F98A}"), "kai");
+  assert.equal(A.normalizeAvatar("zip"), "zip");
+  assert.equal(A.normalizeAvatar("<script>"), "kai", "valor inválido cai no padrão");
+  const p = A.Store.createProfile(0);
+  p.avatar = "\u{1F984}";
+  A.Store.save(p);
+  assert.equal(loadApp(storage).Store.load(0).avatar, "lyra");
+});
+
+test("mundos: toda unidade da trilha tem um mundo temático", () => {
+  const { World } = loadArt();
+  const { Data } = loadApp();
+  for (const u of Data.units) {
+    assert.ok(World.WORLDS[u.id], `unidade ${u.id} sem mundo`);
+  }
+  assert.equal(new Set(Object.values(World.WORLDS).map((w) => w.theme)).size, Data.units.length, "mundos repetidos");
 });
 
 test("arte: toda conquista tem emblema próprio e os níveis progridem", () => {
-  const Art = loadArt();
+  const { Art } = loadArt();
   const { Progress: P } = loadApp();
   for (const b of P.BADGES) assert.ok(Art.BADGE_ART[b.id], `conquista sem arte: ${b.id}`);
   assert.equal(Art.levelTier(1).name, "Semente");

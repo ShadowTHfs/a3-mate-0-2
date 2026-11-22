@@ -126,6 +126,7 @@ window.App = window.App || {};
       + `<path d="M8.6 10.6h6.8M8.6 13.4h4.4" stroke="${TONES.gray[1]}" stroke-width="1.4" stroke-linecap="round"/>`
       + `<path d="M10.2 16.6l1.4 1.4 3-3" fill="none" stroke="${TONES.green[1]}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`,
     spark: solid("M12 2c.9 5.1 4.9 9.1 10 10-5.1.9-9.1 4.9-10 10-.9-5.1-4.9-9.1-10-10 5.1-.9 9.1-4.9 10-10Z", "gold", 0.8),
+    play: solid(circ(12, 12, 9.6), "green") + '<path d="M10 8.2v7.6l6-3.8Z" fill="#fff" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>',
     close: line("M6.5 6.5l11 11M17.5 6.5l-11 11", "gray", 3, 1),
     // Ícones das unidades da trilha
     "u-expr": solid(rrect(2.5, 3.5, 19, 17, 5), "blue") + `<text x="12" y="16.6" text-anchor="middle" font-size="11" fill="#fff" ${FONT}>x²</text>`
@@ -467,7 +468,8 @@ window.App = window.App || {};
     const symbols = Object.entries(ICONS)
       .map(([name, body]) => `<symbol id="i-${name}" viewBox="0 0 24 24" overflow="visible">${body}</symbol>`)
       .join("");
-    const defs = gradientDefs() + SHARED_MASCOT_DEFS + Object.keys(CHARS).map(mascotDefs).join("");
+    const defs = gradientDefs() + SHARED_MASCOT_DEFS + Object.keys(CHARS).map(mascotDefs).join("")
+      + (App.World ? App.World.defs() : "") + (App.Avatars ? App.Avatars.defs() : "");
     // Sem display:none: em alguns navegadores isso desligaria os gradientes referenciados.
     return `<svg id="art-sprite" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false"><defs>${defs}</defs>${symbols}</svg>`;
   }

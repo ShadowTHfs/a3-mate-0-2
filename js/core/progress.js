@@ -184,14 +184,14 @@ window.App = window.App || {};
 
   /* ---------- Conquistas ---------- */
   const BADGES = [
-    { id: "first-lesson", icon: "🌱", name: "Primeiro passo", desc: "Conclua sua primeira lição.", check: (p) => p.totals.lessonsCompleted >= 1 },
-    { id: "perfect", icon: "💎", name: "Perfeição", desc: "Conclua uma lição sem nenhum erro.", check: (p) => Object.values(p.lessons).some((l) => l.stars === 3) },
-    { id: "streak-3", icon: "🔥", name: "Em chamas", desc: "Estude 3 dias seguidos.", check: (p) => p.bestStreak >= 3 },
-    { id: "streak-7", icon: "🏅", name: "Semana perfeita", desc: "Estude 7 dias seguidos.", check: (p) => p.bestStreak >= 7 },
-    { id: "correct-50", icon: "🎯", name: "Atirador", desc: "Acerte 50 questões.", check: (p) => p.totals.correct >= 50 },
-    { id: "level-3", icon: "🚀", name: "Em órbita", desc: "Alcance o nível 3.", check: (p) => levelInfo(p.xp).level >= 3 },
-    { id: "practice", icon: "♻️", name: "Revisor", desc: "Conclua uma revisão de erros.", check: (p) => p.totals.practiceSessions >= 1 },
-    { id: "simulado", icon: "📝", name: "Simulado feito", desc: "Conclua um simulado.", check: (p) => p.totals.simulados >= 1 },
+    { id: "first-lesson", name: "Primeiro passo", desc: "Conclua sua primeira lição.", check: (p) => p.totals.lessonsCompleted >= 1 },
+    { id: "perfect", name: "Perfeição", desc: "Conclua uma lição sem nenhum erro.", check: (p) => Object.values(p.lessons).some((l) => l.stars === 3) },
+    { id: "streak-3", name: "Em chamas", desc: "Estude 3 dias seguidos.", check: (p) => p.bestStreak >= 3 },
+    { id: "streak-7", name: "Semana perfeita", desc: "Estude 7 dias seguidos.", check: (p) => p.bestStreak >= 7 },
+    { id: "correct-50", name: "Atirador", desc: "Acerte 50 questões.", check: (p) => p.totals.correct >= 50 },
+    { id: "level-3", name: "Em órbita", desc: "Alcance o nível 3.", check: (p) => levelInfo(p.xp).level >= 3 },
+    { id: "practice", name: "Revisor", desc: "Conclua uma revisão de erros.", check: (p) => p.totals.practiceSessions >= 1 },
+    { id: "simulado", name: "Simulado feito", desc: "Conclua um simulado.", check: (p) => p.totals.simulados >= 1 },
   ];
 
   function evaluateBadges(profile, now) {

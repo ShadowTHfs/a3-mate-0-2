@@ -5,6 +5,8 @@ trilha de lições, vidas, XP, níveis, sequência de dias, conquistas e simulad
 
 ## Funcionalidades
 
+- **Mapa de mundos:** as 6 unidades viram 6 mundos temáticos (Floresta das Variáveis, Deserto do Equilíbrio, Picos Gelados, Vulcão das Funções, Recife das Parábolas e Céu do ENEM), cada um com cenário animado próprio. Cada fase é uma ilha flutuante com construção própria e número na placa, ligadas por uma trilha que acende conforme você avança. Fases concluídas mostram selo e estrelas, a atual brilha com seu personagem ao lado, e as bloqueadas ficam escurecidas com cadeado (que se quebra numa animação quando a fase libera). Cada mundo termina num baú de recompensa.
+- **Personagens:** 8 personagens originais desenhados como sprites (Kai, Nova, Lyra, Tor, Iara, Bit, Sombra e Zip), com tela de escolha estilo jogo: palco, nome, classe, descrição e atributos. Perfis antigos com emoji são convertidos automaticamente.
 - **Trilha de aprendizado:** 6 unidades e 11 lições. Cada lição começa com uma teoria curta e depois os exercícios. A próxima lição só desbloqueia quando a anterior é concluída.
 - **Exercícios com feedback imediato:** explicação após cada resposta, dica opcional (que reduz pela metade o XP da questão) e revisitação de questões erradas no fim da fila.
 - **Vidas:** 5 vidas. Um erro em lição tira uma vida, e **uma vida volta a cada 2 minutos**. O contador é real: ele usa o horário salvo no perfil, então continua contando ao recarregar a página, trocar de tela, fechar o navegador ou abrir outra aba. Quem fica 5 minutos fora volta com +2 vidas e com 1 minuto já andado da próxima. Com 5/5 não há contador. Sem vidas, a lição não inicia (a revisão continua disponível).
@@ -44,6 +46,8 @@ js/core/progress.js     Regras de gamificação (XP, níveis, vidas, sequência,
 js/core/quiz.js         Motor de sessão de quiz, sem DOM
 js/data/questions.js    Banco de questões
 js/data/units.js        Trilha: unidades, lições, teoria e questões de cada lição
+js/ui/avatars.js        Personagens jogáveis (sprites SVG) e seus dados
+js/ui/world.js          Mundos do mapa: cenários, ilhas, cadeado, baú e medalhões
 js/ui/art.js            Arte vetorial: ícones, mascotes, emblemas de nível e de conquistas
 js/ui/views.js          Telas em HTML
 js/app.js               Roteamento por hash, ações do usuário e fluxo das sessões
@@ -78,7 +82,6 @@ O gabarito é guardado pelo texto da alternativa, e não pelo índice. Por isso 
 
 - O progresso é salvo apenas no navegador onde o app foi usado. Ele não sincroniza entre dispositivos.
 - O contador de vidas usa o relógio do aparelho. Se a pessoa adiantar o relógio, ganha vidas antes da hora (só um servidor resolveria isso). Se atrasar, o contador recomeça em vez de travar.
-- Os avatares do perfil continuam sendo emojis.
 - Uma sessão em andamento não sobrevive a um recarregamento da página.
 - Os efeitos sonoros dependem do navegador liberar o áudio após o primeiro toque.
 - O banco tem 44 questões. Cada lição usa sempre as mesmas questões, na mesma ordem (só a ordem das alternativas muda).

@@ -14,6 +14,8 @@ window.App = window.App || {};
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
   const A = App.Art;
+  const W = App.World;
+  const AV = App.Avatars;
   const icon = (name, size = 24, cls = "") => A.icon(name, { size, cls });
   const mascot = (pose = "happy", size = 110, who = "raiz", opts) => A.mascot(pose, size, who, opts);
 
@@ -118,111 +120,289 @@ window.App = window.App || {};
       <span class="chip chip-xp" title="XP total e nível">${icon("star", 22)} <b>${profile.xp}</b><span class="sr-only"> XP, nível ${info.level}</span>
         <span class="chip-level" aria-hidden="true">${A.levelEmblem(info.level, 26, { label: "" })}</span></span>
       ${heartsChip(profile, now, heartsOpen)}
-      ${soundButton(profile)}`;
+      ${soundButton(profile)}
+      <a class="avatar-chip" href="#/profile" title="Seu perfil" aria-label="Seu perfil: ${esc(AV.get(profile.avatar).name)}">${AV.sprite(profile.avatar, 40, { portrait: true, label: "" })}</a>`;
   }
 
-  function avatarButtons(selected) {
-    return App.AVATARS.map((emoji) => `
-      <button type="button" class="avatar-opt" data-action="pick-avatar" data-arg="${emoji}"
-        aria-pressed="${emoji === selected}" aria-label="Avatar ${emoji}">${emoji}</button>`).join("");
+  /* ---------- Escolha de personagem ---------- */
+  function charSelect(selected) {
+    const ch = AV.get(selected);
+    const pips = (v) => [1, 2, 3, 4, 5].map((i) => `<i class="${i <= v ? "on" : ""}"></i>`).join("");
+    const stats = Object.entries(ch.stats).map(([k, v]) => `
+      <li><span>${AV.STAT_LABELS[k]}</span><span class="pips" role="img" aria-label="${v} de 5">${pips(v)}</span></li>`).join("");
+    const roster = AV.CHARACTERS.map((c) => {
+      const on = c.id === ch.id;
+      return `<button type="button" class="char-card${on ? " is-selected" : ""}" role="radio" aria-checked="${on}"
+        data-action="pick-avatar" data-arg="${c.id}" style="--c:${c.color}" aria-label="${esc(c.name)}, ${esc(c.role)}">
+        <span class="char-portrait">${AV.sprite(c.id, 62, { portrait: true, label: "" })}</span>
+        <b>${esc(c.name)}</b><small>${esc(c.role)}</small></button>`;
+    }).join("");
+    return `
+    <div class="char-select" style="--c:${ch.color}">
+      <div class="char-hero">
+        <div class="char-stage" aria-hidden="true">
+          <span class="stage-spot"></span>
+          <span class="stage-figure">${AV.sprite(ch.id, 150, { label: "" })}</span>
+          <span class="stage-podium"></span>
+        </div>
+        <div class="char-info" aria-live="polite">
+          <p class="eyebrow">${esc(ch.role.toUpperCase())}</p>
+          <h3 class="char-name">${esc(ch.name)}</h3>
+          <p class="char-bio">${esc(ch.bio)}</p>
+          <ul class="char-stats">${stats}</ul>
+        </div>
+      </div>
+      <div class="char-roster" role="radiogroup" aria-label="Personagens">${roster}</div>
+    </div>`;
   }
 
   function onboardingView(avatar, name) {
     return `
-    <section class="page narrow onboard">
+    <section class="page onboard">
       <div class="onboard-hero">
         <span class="cast cast-l">${mascot("happy", 86, "lumi")}</span>
         ${mascot("encourage", 160, "raiz")}
         <span class="cast cast-r">${mascot("happy", 86, "brasa")}</span>
       </div>
-      <div class="speech">Oi! Eu sou o Raiz. Com o Lumi e a Brasa, vamos montar a sua trilha de álgebra?</div>
+      <div class="speech">Oi! Eu sou o Raiz. Escolha seu personagem e vamos explorar os mundos da álgebra!</div>
       <h1 tabindex="-1">Bem-vindo ao Desafio!</h1>
-      <form class="card form" data-form="onboarding">
-        <label for="name">Como podemos te chamar?</label>
-        <input id="name" name="name" maxlength="24" autocomplete="nickname"
-          placeholder="Seu nome ou apelido" value="${esc(name)}" />
-        <span class="label" id="avatar-label">Escolha seu avatar</span>
-        <div class="avatar-grid" role="group" aria-labelledby="avatar-label">${avatarButtons(avatar)}</div>
-        <button class="btn btn-primary btn-block btn-xl" type="submit">Começar a jogar →</button>
+      <form class="game-panel form" data-form="onboarding">
+        <label class="nameplate" for="name">
+          <span>Nome do jogador</span>
+          <input id="name" name="name" maxlength="24" autocomplete="nickname" placeholder="Seu nome ou apelido" value="${esc(name)}" />
+        </label>
+        <span class="label" id="avatar-label">Escolha seu personagem</span>
+        ${charSelect(avatar)}
+        <button class="btn btn-primary btn-block btn-xl" type="submit">${icon("play", 26)} Começar a jogar</button>
       </form>
     </section>`;
   }
 
-  function nodeHtml(s, i, isNext) {
-    const cls = s.completed ? "done" : s.unlocked ? "open" : "locked";
-    const side = i % 2 === 0 ? "left" : "right";
-    const content = s.completed ? icon("check", 44) : s.unlocked ? s.lesson.number : icon("lock", 34);
-    const aria = s.completed
-      ? `, concluída, ${s.stars} de 3 estrelas`
-      : s.unlocked ? "" : ", bloqueada";
-    const attrs = s.unlocked ? `data-action="go" data-arg="#/lesson/${s.lesson.id}"` : "disabled";
-    const crown = s.stars === 3 ? `<span class="crown" aria-hidden="true">${icon("crown", 30)}</span>` : "";
-    const bubble = isNext ? '<span class="start-bubble" aria-hidden="true">COMEÇAR</span>' : "";
-    const stars = s.completed ? `<span class="stars" aria-hidden="true">${starRow(s.stars, 18)}</span>` : "";
-    return `
-    <li class="path-item ${side}">
-      ${bubble}
-      <button type="button" class="node ${cls}" ${attrs}
-        aria-label="Lição ${s.lesson.number}: ${esc(s.lesson.title)}${aria}">
-        ${crown}<span aria-hidden="true">${content}</span>
-      </button>
-      <span class="node-label">${esc(s.lesson.title)}</span>
-      ${stars}
-    </li>`;
+  /* ---------- Mapa de mundos ---------- */
+  const XS = [28, 70, 34, 66];
+  const ROUTE_Y = 34; // centro da ilha dentro da linha (0..100)
+
+  function routePath(points) {
+    if (points.length < 2) return "";
+    let d = `M${points[0][0]} ${points[0][1]}`;
+    for (let i = 1; i < points.length; i += 1) {
+      const [x0, y0] = points[i - 1];
+      const [x1, y1] = points[i];
+      d += `C${x0} ${y0 + 55} ${x1} ${y1 - 55} ${x1} ${y1}`;
+    }
+    return d;
   }
 
-  function homeView(profile, states, now) {
-    const next = states.find((s) => s.unlocked && !s.completed);
-    const streak = P.currentStreak(profile, now);
-    const info = P.levelInfo(profile.xp);
-    const ratio = Math.round(info.ratio * 100);
-    const streakText = streak > 0
-      ? `Sequência de ${plural(streak, "dia", "dias")}! Não quebre a corrente.`
-      : "Complete uma lição hoje e acenda sua sequência!";
-    const tier = A.levelTier(info.level);
-    const cta = next
-      ? `<button type="button" class="btn btn-primary btn-block btn-xl" data-action="go" data-arg="#/lesson/${next.lesson.id}">Continuar: ${esc(next.lesson.title)} →</button>`
-      : `<p class="done-note">Trilha concluída! Treine a revisão e os simulados para manter o nível.</p>`;
-
-    const units = App.Data.units.map((unit, idx) => {
-      const items = states.filter((s) => s.lesson.unitId === unit.id);
-      const done = items.filter((s) => s.completed).length;
-      return `
-      <section class="unit unit-${unit.color}" aria-labelledby="unit-${unit.id}">
-        <header class="unit-banner">
-          <span class="unit-emoji" aria-hidden="true">${A.UNIT_ICONS[unit.id] ? icon(A.UNIT_ICONS[unit.id], 38) : esc(unit.emoji)}</span>
-          <div class="unit-text">
-            <small>UNIDADE ${idx + 1}</small>
-            <h2 id="unit-${unit.id}">${esc(unit.title)}</h2>
-          </div>
-          <span class="unit-count">${done}/${items.length}</span>
-        </header>
-        <ol class="path">${items.map((s, i) => nodeHtml(s, i, s === next)).join("")}</ol>
-      </section>`;
-    }).join("");
-
+  function wnodeHtml(s, i, ctx) {
+    const { profile, next, justUnlocked } = ctx;
+    const isCurrent = s === next;
+    const state = s.completed ? "done" : isCurrent ? "current" : s.unlocked ? "open" : "locked";
+    const pill = { done: "Concluída", current: "Atual", open: "Jogar", locked: "Bloqueada" }[state];
+    const aria = `Fase ${s.lesson.number}: ${esc(s.lesson.title)}, ${pill.toLowerCase()}${s.completed ? `, ${s.stars} de 3 estrelas` : ""}`;
+    const attrs = s.unlocked ? `data-action="go" data-arg="#/lesson/${s.lesson.id}"` : "disabled";
+    const just = justUnlocked === s.lesson.id ? " just-unlocked" : "";
+    const player = isCurrent
+      ? `<span class="wnode-player" aria-hidden="true">${AV.sprite(profile.avatar, 54, { label: "" })}</span>
+         <span class="start-bubble" aria-hidden="true">COMEÇAR</span>`
+      : "";
     return `
-    <section class="page">
-      <div class="card hero">
-        <div class="hero-mascot">${mascot(streak > 0 ? "streak" : "encourage", 120)}</div>
-        <div class="hero-text">
-          <h1 tabindex="-1">Olá${profile.name ? `, ${esc(profile.name)}` : ""}! ${esc(profile.avatar)}</h1>
-          <div class="speech">${esc(streakText)}</div>
-          <div class="hero-level">
-            ${A.levelEmblem(info.level, 52)}
-            <div class="hero-level-text">
-              <p class="eyebrow">NÍVEL ${info.level} · ${esc(tier.name.toUpperCase())}</p>
-              <div class="bar xp" role="progressbar" aria-label="Progresso até o nível ${info.level + 1}"
-            aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ratio}">
-            <span style="width:${ratio}%"></span>
-          </div>
-              <small class="muted">${info.into} de ${info.span} XP para o nível ${info.level + 1}</small>
-            </div>
+      <li class="wnode is-${state}${just}" style="--x:${XS[i % XS.length]}%">
+        <div class="wnode-inner">
+          ${player}
+          <button type="button" class="island-btn" ${attrs} aria-label="${aria}">
+            <span class="island-glow" aria-hidden="true"></span>
+            ${W.island(s.lesson.unitId, i, s.lesson.number)}
+            ${s.completed ? `<span class="island-done" aria-hidden="true">${icon("check", 30)}</span>` : ""}
+            ${state === "locked" || just ? `<span class="island-lock" aria-hidden="true">${W.lock(40)}</span>` : ""}
+          </button>
+          <div class="wnode-label">
+            <b>${esc(s.lesson.title)}</b>
+            <span class="state-pill">${pill}</span>
+            ${s.completed ? `<span class="stars">${starRow(s.stars, 16)}</span>` : ""}
           </div>
         </div>
-        <div class="hero-cta">${cta}</div>
+      </li>`;
+  }
+
+  function worldSection(unit, idx, states, ctx) {
+    const w = W.world(unit.id);
+    const items = states.filter((s) => s.lesson.unitId === unit.id);
+    const done = items.filter((s) => s.completed).length;
+    const complete = done === items.length;
+    const locked = !items.some((s) => s.unlocked);
+    const stars = items.reduce((n, s) => n + s.stars, 0);
+    const rows = items.length + 1; // ilhas + baú
+    const pts = [];
+    for (let i = 0; i < rows; i += 1) pts.push([i === rows - 1 ? 50 : XS[i % XS.length], i * 100 + ROUTE_Y]);
+    const lit = pts.slice(0, Math.min(rows, done + 1));
+    const nodes = items.map((s, i) => wnodeHtml(s, i, ctx)).join("");
+    return `
+      <section class="world world-${w.theme}${locked ? " is-locked" : ""}${complete ? " is-complete" : ""}" id="world-${unit.id}"
+        aria-labelledby="wt-${unit.id}" style="--wt:${w.sky[0]};--wb:${w.bottom};--wa:${w.accent}">
+        <div class="world-bg">${W.scene(unit.id, idx + 1)}</div>
+        <header class="world-banner">
+          ${W.emblem(unit.id, 58)}
+          <div class="world-title">
+            <small>MUNDO ${idx + 1} · ${esc(unit.title.toUpperCase())}</small>
+            <h2 id="wt-${unit.id}">${esc(w.name)}</h2>
+          </div>
+          <span class="world-count">${locked ? `${W.lock(22)}<span class="wc-text">Bloqueado</span>` : `${icon("star", 18)} ${done}/${items.length}`}</span>
+        </header>
+        ${locked ? `<p class="world-note">Conclua o Mundo ${idx} para abrir este mundo.</p>` : ""}
+        <div class="wmap" style="--rows:${rows}">
+          <svg class="wroute" viewBox="0 0 100 ${rows * 100}" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path class="route-base" d="${routePath(pts)}"/>
+            ${lit.length > 1 ? `<path class="route-lit" d="${routePath(lit)}"/>` : ""}
+          </svg>
+          <ol class="wnodes">
+            ${nodes}
+            <li class="wnode wchest${complete ? " is-open" : ""}" style="--x:50%">
+              <div class="wnode-inner">
+                <span class="chest-wrap">${W.chest(complete, 92)}</span>
+                <div class="wnode-label"><b>Baú do mundo</b>
+                  <span class="state-pill">${complete ? "Aberto" : "Fechado"} · ${stars}/${items.length * 3}</span></div>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>`;
+  }
+
+  function worldStrip(states, next) {
+    return App.Data.units.map((unit, idx) => {
+      const items = states.filter((s) => s.lesson.unitId === unit.id);
+      const done = items.filter((s) => s.completed).length;
+      const locked = !items.some((s) => s.unlocked);
+      const current = next && next.lesson.unitId === unit.id;
+      const pct = Math.round((done / items.length) * 100);
+      return `<button type="button" class="wstrip-item${current ? " is-current" : ""}${locked ? " is-locked" : ""}"
+        data-action="scroll-world" data-arg="world-${unit.id}" style="--p:${pct}">
+        <span class="wstrip-emblem">${W.emblem(unit.id, 46)}${locked ? `<span class="wstrip-lock">${W.lock(20)}</span>` : ""}</span>
+        <span class="wstrip-text"><b>Mundo ${idx + 1}</b><small>${esc(W.world(unit.id).short)} · ${done}/${items.length}</small></span>
+      </button>`;
+    }).join("");
+  }
+
+  function progressCard(profile, now) {
+    const info = P.levelInfo(profile.xp);
+    const tier = A.levelTier(info.level);
+    const ratio = Math.round(info.ratio * 100);
+    const streak = P.currentStreak(profile, now);
+    return `
+      <div class="side-card progress-card">
+        <div class="pc-head">
+          <div>
+            <p class="side-title">${icon("level", 22)} Seu progresso</p>
+            <p class="pc-level">Nível ${info.level}</p>
+            <p class="pc-tier">${esc(tier.name)} · ${info.into} / ${info.span} XP</p>
+          </div>
+          ${A.levelEmblem(info.level, 78)}
+        </div>
+        <div class="bar xp" role="progressbar" aria-label="Progresso até o nível ${info.level + 1}"
+          aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ratio}"><span style="width:${ratio}%"></span></div>
+        <div class="pc-stats">
+          <div>${icon("flame", 30)}<span><b>${plural(streak, "dia", "dias")}</b><small>sequência</small></span></div>
+          <div>${icon("star", 30)}<span><b>${profile.xp}</b><small>XP total</small></span></div>
+        </div>
+      </div>`;
+  }
+
+  function statsCard(profile) {
+    const t = profile.totals;
+    const pct = percent(t.correct, t.answered);
+    const C = 2 * Math.PI * 34;
+    return `
+      <div class="side-card stats-card">
+        <p class="side-title">${icon("target", 22)} Suas estatísticas</p>
+        <div class="sc-body">
+          <svg class="ring" viewBox="0 0 80 80" role="img" aria-label="${pct}% de acerto">
+            <circle cx="40" cy="40" r="34" class="ring-track"/>
+            <circle cx="40" cy="40" r="34" class="ring-fill" style="stroke-dasharray:${(C * pct / 100).toFixed(1)} ${C.toFixed(1)}"/>
+            <text x="40" y="46" text-anchor="middle">${pct}%</text>
+          </svg>
+          <ul class="sc-list">
+            <li>${icon("check", 24)}<span><b>${t.correct}</b><small>Acertos</small></span></li>
+            <li>${icon("close", 24)}<span><b>${t.wrong}</b><small>Erros</small></span></li>
+            <li>${icon("book", 24)}<span><b>${t.lessonsCompleted}</b><small>Fases concluídas</small></span></li>
+          </ul>
+        </div>
+      </div>`;
+  }
+
+  function recentBadgesCard(profile) {
+    const got = P.BADGES.filter((b) => profile.badges[b.id])
+      .sort((a, b) => profile.badges[b.id] - profile.badges[a.id]).slice(0, 5);
+    const list = got.length
+      ? got.map((b) => `<li title="${esc(b.name)}">${A.badgeArt(b.id, true, 54, { label: b.name })}</li>`).join("")
+      : P.BADGES.slice(0, 4).map((b) => `<li>${A.badgeArt(b.id, false, 54, { label: `${b.name} (bloqueada)` })}</li>`).join("");
+    return `
+      <div class="side-card badges-card">
+        <div class="side-row"><p class="side-title">${icon("medal", 22)} Conquistas recentes</p>
+          <a class="side-link" href="#/profile">Ver todas →</a></div>
+        <ul class="badge-row">${list}</ul>
+        ${got.length ? "" : '<p class="muted small">Conclua sua primeira fase para ganhar a primeira conquista.</p>'}
+      </div>`;
+  }
+
+  function challengeCard() {
+    return `
+      <div class="side-card challenge-card">
+        <div class="cc-mascot">${mascot("encourage", 104, "lumi", { label: "" })}</div>
+        <div class="cc-text">
+          <p class="cc-title">Desafie-se!</p>
+          <p>Teste seus conhecimentos com 10 questões sorteadas, no estilo ENEM.</p>
+          <button type="button" class="btn btn-gold" data-action="go" data-arg="#/simulado">${icon("target", 22)} Jogar desafio</button>
+        </div>
+      </div>`;
+  }
+
+  function homeView(profile, states, now, justUnlocked = null) {
+    const next = states.find((s) => s.unlocked && !s.completed);
+    const streak = P.currentStreak(profile, now);
+    const ch = AV.get(profile.avatar);
+    const nextWorld = next ? W.world(next.lesson.unitId) : null;
+    const cta = next
+      ? `<button type="button" class="btn btn-play btn-xl" data-action="go" data-arg="#/lesson/${next.lesson.id}">${icon("play", 28)} Estudar</button>`
+      : `<button type="button" class="btn btn-play btn-xl" data-action="go" data-arg="#/simulado">${icon("target", 26)} Jogar desafio</button>`;
+    const sub = next
+      ? `Próxima fase: <b>${esc(next.lesson.title)}</b> · ${esc(nextWorld.name)}`
+      : "Você concluiu todos os mundos! Mantenha o nível nos desafios.";
+    const streakLine = streak > 0
+      ? `${icon("flame", 20)} ${plural(streak, "dia", "dias")} de sequência. Não quebre a corrente!`
+      : `${icon("flame", 20)} Complete uma fase hoje e acenda sua sequência.`;
+    const ctx = { profile, next, justUnlocked };
+
+    return `
+    <section class="page home">
+      <div class="home-grid">
+        <div class="home-main">
+          <div class="home-hero">
+            <div class="hero-scene" aria-hidden="true">${W.scene("u6", 9)}</div>
+            <div class="hero-char">${mascot(streak > 0 ? "streak" : "study", 168)}</div>
+            <div class="hero-speech">
+              <p class="hero-hi">${AV.sprite(ch.id, 34, { portrait: true, label: "" })} Olá${profile.name ? `, ${esc(profile.name)}` : ""}!</p>
+              <h1 tabindex="-1">Vamos continuar seu aprendizado?</h1>
+              <p class="hero-sub">${sub}</p>
+              <p class="hero-streak">${streakLine}</p>
+              ${cta}
+            </div>
+          </div>
+
+          <div class="section-head"><h2 class="h-ico">${icon("book", 28)} Suas fases</h2></div>
+          <nav class="world-strip" aria-label="Mundos">${worldStrip(states, next)}</nav>
+
+          <div class="world-map">
+            ${App.Data.units.map((u, i) => worldSection(u, i, states, ctx)).join("")}
+          </div>
+        </div>
+
+        <aside class="home-side" aria-label="Resumo do jogador">
+          ${progressCard(profile, now)}
+          ${statsCard(profile)}
+          ${recentBadgesCard(profile)}
+          ${challengeCard()}
+        </aside>
       </div>
-      ${units}
     </section>`;
   }
 
@@ -490,23 +670,23 @@ window.App = window.App || {};
     return `
     <section class="page profile">
       <div class="theory-head">
-        ${mascot("happy", 96)}
+        ${AV.sprite(profile.avatar, 84)}
         <div>
           <p class="eyebrow">PERFIL · NÍVEL ${info.level}</p>
           <h1 tabindex="-1">Seu progresso</h1>
         </div>
       </div>
 
-      <form class="card form inline" data-form="profile-name">
-        <div class="avatar-current" aria-hidden="true">${esc(profile.avatar)}</div>
-        <label class="sr-only" for="pname">Nome</label>
-        <input id="pname" name="name" maxlength="24" value="${esc(profile.name)}" placeholder="Seu nome" />
-        <button type="submit" class="btn btn-primary">Salvar nome</button>
-      </form>
-
-      <div class="card">
-        <span class="label" id="avatar-label-profile">Trocar avatar</span>
-        <div class="avatar-grid" role="group" aria-labelledby="avatar-label-profile">${avatarButtons(profile.avatar)}</div>
+      <div class="game-panel player-panel">
+        <form class="form inline" data-form="profile-name">
+          <label class="nameplate" for="pname">
+            <span>Nome do jogador</span>
+            <input id="pname" name="name" maxlength="24" value="${esc(profile.name)}" placeholder="Seu nome" />
+          </label>
+          <button type="submit" class="btn btn-primary">Salvar nome</button>
+        </form>
+        <h2 class="h-ico">${icon("profile", 28)} Trocar personagem</h2>
+        ${charSelect(profile.avatar)}
       </div>
 
       <div class="card settings-row">
@@ -577,6 +757,7 @@ window.App = window.App || {};
     heartSubText,
     heartLine,
     onboardingView,
+    charSelect,
     homeView,
     theoryView,
     lockedView,

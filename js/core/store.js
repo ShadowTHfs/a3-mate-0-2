@@ -46,7 +46,9 @@ window.App = window.App || {};
       const saved = JSON.parse(raw);
       const base = createProfile(now);
       // Mescla com os padrões: campos novos em versões futuras não quebram perfis antigos.
-      return { ...base, ...saved, totals: { ...base.totals, ...(saved.totals || {}) } };
+      const merged = { ...base, ...saved, totals: { ...base.totals, ...(saved.totals || {}) } };
+      merged.avatar = App.normalizeAvatar(merged.avatar); // emoji antigo vira personagem
+      return merged;
     } catch (e) {
       return createProfile(now);
     }

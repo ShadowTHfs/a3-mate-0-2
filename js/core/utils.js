@@ -35,6 +35,15 @@ window.App = window.App || {};
     return whole ? Math.round((part / whole) * 100) : 0;
   }
 
-  App.AVATARS = ["🦊", "🐼", "🐯", "🦁", "🐸", "🐙", "🦉", "🚀", "🐬", "🦄", "🐧", "🤖"];
+  /* Personagens jogáveis (desenhados em js/ui/avatars.js). O perfil guarda o id. */
+  App.AVATARS = ["kai", "nova", "lyra", "tor", "iara", "bit", "sombra", "zip"];
+  /* Perfis antigos guardavam um emoji como avatar: cada um vira um personagem parecido. */
+  const LEGACY_AVATARS = {
+    "\u{1F98A}": "kai", "\u{1F43C}": "kai", "\u{1F42F}": "tor", "\u{1F981}": "tor",
+    "\u{1F438}": "iara", "\u{1F419}": "sombra", "\u{1F989}": "lyra", "\u{1F680}": "zip",
+    "\u{1F42C}": "nova", "\u{1F984}": "lyra", "\u{1F427}": "nova", "\u{1F916}": "bit",
+  };
+  App.normalizeAvatar = (value) =>
+    App.AVATARS.includes(value) ? value : LEGACY_AVATARS[value] || App.AVATARS[0];
   App.Utils = { esc, dateKey, addDays, shuffle, formatClock, percent };
 })(window.App);

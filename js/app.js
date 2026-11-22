@@ -89,9 +89,34 @@ window.App = window.App || {};
         return { html: V.simuladoIntroView(profile), route: "simulado" };
       case "profile":
         return { html: V.profileView(profile, t), route: "profile" };
-      default:
-        return { html: V.homeView(profile, allStates(), t), route: "home" };
+      default: {
+        const states = allStates();
+        return { html: V.homeView(profile, states, t, unlockAnimationTarget(states)), route: "home" };
+      }
     }
+  }
+
+  /* Animação de desbloqueio: toca uma vez quando o mapa mostra uma fase recém-liberada. */
+  const SEEN_KEY = "desafio-algebrico:seen-unlocked";
+  function unlockAnimationTarget(states) {
+    const unlocked = states.filter((s) => s.unlocked).length;
+    let seen = 0;
+    try {
+      seen = Number(localStorage.getItem(SEEN_KEY)) || 0;
+      localStorage.setItem(SEEN_KEY, String(unlocked));
+    } catch (e) {
+      return null; // sem armazenamento: só não anima
+    }
+    if (!seen || unlocked <= seen) return null;
+    const cur = states.find((s) => s.unlocked && !s.completed);
+    return cur ? cur.lesson.id : null;
+  }
+
+  function scrollToWorld(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   }
 
   function updateNav(routeName) {
@@ -402,18 +427,19 @@ window.App = window.App || {};
   }
 
   /* Redesenhar a tela não pode apagar o que a pessoa já digitou no campo de nome. */
-  function onPickAvatar(emoji) {
+  function onPickAvatar(id) {
+    if (!App.AVATARS.includes(id)) return;
     const input = document.querySelector("input[name=name]");
     const typed = input ? input.value.trim().slice(0, 24) : null;
     if (!state.profile.onboarded) {
-      state.draftAvatar = emoji;
+      state.draftAvatar = id;
       if (typed !== null) state.draftName = typed;
     } else {
-      state.profile.avatar = emoji;
+      state.profile.avatar = id;
       if (typed) state.profile.name = typed;
       persist();
     }
-    render({ focus: `[data-arg="${emoji}"]` });
+    render({ focus: `[data-arg="${id}"]` });
   }
 
   function onToggleSound() {
@@ -453,6 +479,7 @@ window.App = window.App || {};
     "pick-avatar": onPickAvatar,
     "toggle-sound": onToggleSound,
     "reset-progress": onReset,
+    "scroll-world": scrollToWorld,
     "toggle-hearts": () => setHeartsOpen(!state.heartsOpen, true),
   };
 

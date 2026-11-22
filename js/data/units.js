@@ -8,7 +8,7 @@ window.App = window.App || {};
   App.Data = App.Data || {};
   App.Data.units = [
     {
-      id: "u1", title: "Expressões algébricas", emoji: "🔤", color: "blue",
+      id: "u1", title: "Expressões algébricas", color: "blue",
       lessons: [
         {
           id: "u1-l1", title: "Termos semelhantes", questions: ["q01", "q02", "q03", "q04"],
@@ -29,7 +29,7 @@ window.App = window.App || {};
       ],
     },
     {
-      id: "u2", title: "Equações do 1º grau", emoji: "⚖️", color: "green",
+      id: "u2", title: "Equações do 1º grau", color: "green",
       lessons: [
         {
           id: "u2-l1", title: "Resolvendo equações", questions: ["q09", "q10", "q11", "q12"],
@@ -49,7 +49,7 @@ window.App = window.App || {};
       ],
     },
     {
-      id: "u3", title: "Sistemas de equações", emoji: "🧩", color: "purple",
+      id: "u3", title: "Sistemas de equações", color: "purple",
       lessons: [
         {
           id: "u3-l1", title: "Resolvendo sistemas", questions: ["q17", "q18", "q19", "q20"],
@@ -69,7 +69,7 @@ window.App = window.App || {};
       ],
     },
     {
-      id: "u4", title: "Função afim", emoji: "📈", color: "orange",
+      id: "u4", title: "Função afim", color: "orange",
       lessons: [
         {
           id: "u4-l1", title: "Lei e gráfico", questions: ["q24", "q25", "q26", "q27"],
@@ -90,7 +90,7 @@ window.App = window.App || {};
       ],
     },
     {
-      id: "u5", title: "Função quadrática", emoji: "🎯", color: "pink",
+      id: "u5", title: "Função quadrática", color: "pink",
       lessons: [
         {
           id: "u5-l1", title: "Raízes e fatoração", questions: ["q32", "q33", "q34", "q35"],
@@ -110,7 +110,7 @@ window.App = window.App || {};
       ],
     },
     {
-      id: "u6", title: "Problemas do cotidiano", emoji: "🧭", color: "teal",
+      id: "u6", title: "Problemas do cotidiano", color: "teal",
       lessons: [
         {
           id: "u6-l1", title: "Estilo ENEM", questions: ["q40", "q41", "q42", "q43", "q44"],
