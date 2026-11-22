@@ -1,0 +1,9 @@
+{
+  "name": "desafio-algebrico",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Plataforma gamificada de álgebra para o Ensino Médio e o ENEM",
+  "scripts": {
+    "test": "node --test tests/logic.test.js"
+  }
+}
